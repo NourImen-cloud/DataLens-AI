@@ -1,10 +1,9 @@
 # DataLens AI 🔍⚡
-> **GOMYCODE Hackathon: “Come Build with AI” (27 September 2026)**  
 > *“Upload your data. Ask anything. Understand everything.”*
 
 ---
 
-## 🏆 Project Architecture for Hackathon Jury
+## 🏆 Project Architecture
 
 DataLens AI transforms any dataset into strategic decisions through natural language conversation without hallucinated numbers. 
 
