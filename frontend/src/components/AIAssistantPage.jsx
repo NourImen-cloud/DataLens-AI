@@ -33,7 +33,9 @@ import {
   BarChart2,
   X,
   SlidersHorizontal,
-  Lightbulb
+  Lightbulb,
+  Volume2,
+  Scale
 } from 'lucide-react';
 import ChartRenderer from './ChartRenderer';
 
@@ -47,7 +49,11 @@ export default function AIAssistantPage({
   onSendQuery,
   loading = false,
   onOpenUpload,
-  onLoadSample
+  onLoadSample,
+  onOpenAudio,
+  onOpenSimulator,
+  onOpenComparator,
+  onOpenSanitizer
 }) {
   const [inputQuery, setInputQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
@@ -174,13 +180,61 @@ export default function AIAssistantPage({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 flex-shrink-0">
+          <div className="flex items-center space-x-2 flex-shrink-0 flex-wrap gap-y-1.5">
+            {onOpenAudio && (
+              <button
+                type="button"
+                onClick={onOpenAudio}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-xs font-bold transition-all shadow-2xs"
+                title="Play Executive Audio Briefing"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Voice Brief</span>
+              </button>
+            )}
+
+            {onOpenSimulator && (
+              <button
+                type="button"
+                onClick={onOpenSimulator}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors"
+                title="What-If Scenario Simulator"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-500" />
+                <span>What-If</span>
+              </button>
+            )}
+
+            {onOpenComparator && (
+              <button
+                type="button"
+                onClick={onOpenComparator}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors"
+                title="Cohort & Segment Comparator"
+              >
+                <Scale className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                <span>Compare</span>
+              </button>
+            )}
+
+            {onOpenSanitizer && (
+              <button
+                type="button"
+                onClick={onOpenSanitizer}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors"
+                title="AI Data Sanitation & Export"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Cleanse</span>
+              </button>
+            )}
+
             <button
               onClick={onOpenUpload}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Change Dataset</span>
+              <span>Change</span>
             </button>
           </div>
         </div>

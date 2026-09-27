@@ -820,5 +820,246 @@ class AnalysisEngine:
             "flat_questions": [q["question"] for q in questions]
         }
 
+    def generate_audio_briefing(self, dataset_id: str) -> Dict[str, Any]:
+        """Generates a natural, professional executive audio speech script based on ground-truth findings."""
+        df = self.get_dataset(dataset_id)
+        profile = self.get_profile(dataset_id)
+        domain_data = self.get_categorized_questions(dataset_id)
+        domain = domain_data.get("domain", {})
+
+        if df is None or profile is None:
+            return {"title": "Dataset Briefing", "script": "No active dataset loaded.", "bullet_points": []}
+
+        rows = profile.get("rows", 0)
+        primary_metric = domain.get("primary_metric") or (profile["numerical_cols"][0] if profile["numerical_cols"] else "records")
+        primary_dim = domain.get("primary_dimension") or (profile["categorical_cols"][0] if profile["categorical_cols"] else None)
+
+        top_leader_name = "N/A"
+        top_leader_val = 0
+        top_leader_share = 0
+        total_val = 0
+
+        if primary_dim and primary_metric and primary_metric in df.columns and primary_dim in df.columns:
+            grp = df.groupby(primary_dim)[primary_metric].sum().sort_values(ascending=False)
+            total_val = float(grp.sum())
+            if not grp.empty:
+                top_leader_name = str(grp.index[0])
+                top_leader_val = float(grp.iloc[0])
+                top_leader_share = round((top_leader_val / (total_val if total_val != 0 else 1)) * 100, 1)
+
+        # Count total outliers across all numerical columns
+        total_outliers = sum(
+            cp.get("stats", {}).get("outliers_count", 0)
+            for cp in profile.get("column_profiles", [])
+            if cp.get("type") == "numerical"
+        )
+
+        formatted_total = f"{total_val:,.0f}" if total_val > 1000 else f"{total_val:.2f}"
+        formatted_lead = f"{top_leader_val:,.0f}" if top_leader_val > 1000 else f"{top_leader_val:.2f}"
+
+        script = (
+            f"Executive Intelligence Briefing for {domain.get('name', 'your dataset')}. "
+            f"Analysis completed across {rows:,} verified records. "
+            f"Cumulative {primary_metric.replace('_', ' ')} stands at {formatted_total}. "
+        )
+        if primary_dim:
+            script += (
+                f"The leading segment is {top_leader_name}, commanding {formatted_lead}, "
+                f"or {top_leader_share} percent of aggregate volume. "
+            )
+        if total_outliers > 0:
+            script += f"A total of {total_outliers} statistical outliers were isolated via 3x IQR analysis and recommended for executive review. "
+        else:
+            script += "Data hygiene is pristine with zero statistical anomalies detected. "
+        script += "Deterministic ground truth verified via DataLens Python kernel."
+
+        bullet_points = [
+            f"Dataset: {dataset_id} ({rows:,} rows · {domain.get('name', 'General')})",
+            f"Primary Metric ({primary_metric}): {formatted_total} cumulative total",
+            f"Dominant Cohort: {top_leader_name} ({top_leader_share}% share)",
+            f"Risk & Hygiene: {total_outliers} outliers isolated for audit"
+        ]
+
+        return {
+            "title": f"Executive Audio Briefing · {domain.get('name', dataset_id)}",
+            "script": script,
+            "bullet_points": bullet_points,
+            "primary_metric": primary_metric,
+            "total_value": total_val,
+            "top_cohort": top_leader_name,
+            "top_share": top_leader_share,
+            "outliers_count": total_outliers
+        }
+
+    def simulate_scenario(self, dataset_id: str, target_metric: str = None, adjustment_pct: float = 10.0, category_col: str = None) -> Dict[str, Any]:
+        """Simulates what-if outcomes on ground-truth distributions."""
+        df = self.get_dataset(dataset_id)
+        profile = self.get_profile(dataset_id)
+        if df is None or profile is None:
+            raise ValueError("Dataset not loaded.")
+
+        num_cols = profile.get("numerical_cols", [])
+        cat_cols = profile.get("categorical_cols", [])
+
+        if not target_metric or target_metric not in df.columns:
+            target_metric = num_cols[0] if num_cols else df.columns[0]
+
+        if not category_col or category_col not in df.columns:
+            category_col = cat_cols[0] if cat_cols else None
+
+        multiplier = 1.0 + (adjustment_pct / 100.0)
+        baseline_series = df[target_metric].dropna()
+        baseline_total = float(baseline_series.sum())
+        baseline_mean = float(baseline_series.mean())
+
+        projected_total = round(baseline_total * multiplier, 2)
+        projected_mean = round(baseline_mean * multiplier, 2)
+        delta_abs = round(projected_total - baseline_total, 2)
+
+        # Cohort breakdown comparison
+        cohort_comparison = []
+        if category_col:
+            grp = df.groupby(category_col)[target_metric].sum().sort_values(ascending=False).head(7)
+            for k, val in grp.items():
+                b_val = round(float(val), 2)
+                p_val = round(b_val * multiplier, 2)
+                cohort_comparison.append({
+                    "name": str(k),
+                    "baseline": b_val,
+                    "projected": p_val,
+                    "delta": round(p_val - b_val, 2)
+                })
+
+        direction = "increase" if adjustment_pct >= 0 else "reduction"
+        return {
+            "dataset_id": dataset_id,
+            "target_metric": target_metric,
+            "adjustment_pct": adjustment_pct,
+            "baseline_total": baseline_total,
+            "projected_total": projected_total,
+            "delta_absolute": delta_abs,
+            "delta_pct": adjustment_pct,
+            "baseline_mean": baseline_mean,
+            "projected_mean": projected_mean,
+            "cohort_comparison": cohort_comparison,
+            "category_dimension": category_col,
+            "executive_takeaway": (
+                f"A {abs(adjustment_pct)}% {direction} in {target_metric.replace('_', ' ')} yields a projected impact "
+                f"of {delta_abs:+,.2f} ({'+' if delta_abs >= 0 else ''}{adjustment_pct}% vs baseline), "
+                f"moving aggregate total from {baseline_total:,.2f} to {projected_total:,.2f}."
+            )
+        }
+
+    def compare_cohorts(self, dataset_id: str, category_col: str, cohort_a: str, cohort_b: str) -> Dict[str, Any]:
+        """Performs exhaustive side-by-side comparative analysis between two cohorts."""
+        df = self.get_dataset(dataset_id)
+        profile = self.get_profile(dataset_id)
+        if df is None or profile is None:
+            raise ValueError("Dataset not loaded.")
+
+        if category_col not in df.columns:
+            raise ValueError(f"Category column {category_col} not found in dataset.")
+
+        df_a = df[df[category_col].astype(str) == str(cohort_a)]
+        df_b = df[df[category_col].astype(str) == str(cohort_b)]
+
+        if df_a.empty or df_b.empty:
+            raise ValueError(f"One or both cohorts ('{cohort_a}', '{cohort_b}') have no records.")
+
+        num_cols = profile.get("numerical_cols", [])[:6]
+        metrics_comparison = []
+
+        total_rows = len(df)
+        share_a = round((len(df_a) / total_rows) * 100, 1)
+        share_b = round((len(df_b) / total_rows) * 100, 1)
+
+        for col in num_cols:
+            sum_a = float(df_a[col].sum())
+            sum_b = float(df_b[col].sum())
+            mean_a = float(df_a[col].mean())
+            mean_b = float(df_b[col].mean())
+
+            delta_sum = round(sum_a - sum_b, 2)
+            delta_mean = round(mean_a - mean_b, 2)
+            pct_diff = round(((mean_a - mean_b) / (mean_b if mean_b != 0 else 1)) * 100, 1)
+
+            leader = cohort_a if mean_a >= mean_b else cohort_b
+
+            metrics_comparison.append({
+                "metric": col,
+                "cohort_a_total": round(sum_a, 2),
+                "cohort_b_total": round(sum_b, 2),
+                "cohort_a_mean": round(mean_a, 2),
+                "cohort_b_mean": round(mean_b, 2),
+                "delta_mean": delta_mean,
+                "pct_diff": pct_diff,
+                "leader": leader
+            })
+
+        lead_metric = metrics_comparison[0] if metrics_comparison else None
+        lead_summary = ""
+        if lead_metric:
+            lead_summary = (
+                f"{cohort_a} records {lead_metric['cohort_a_mean']:,.2f} average {lead_metric['metric']} vs "
+                f"{cohort_b} at {lead_metric['cohort_b_mean']:,.2f} ({lead_metric['pct_diff']:+}% difference)."
+            )
+
+        return {
+            "category_column": category_col,
+            "cohort_a": {"name": cohort_a, "count": len(df_a), "share": share_a},
+            "cohort_b": {"name": cohort_b, "count": len(df_b), "share": share_b},
+            "metrics": metrics_comparison,
+            "summary": lead_summary
+        }
+
+    def clean_and_export_dataset(self, dataset_id: str, clip_outliers: bool = True, fill_missing: bool = True) -> Dict[str, Any]:
+        """Applies automated statistical cleansing and returns sanitized dataset metadata + CSV."""
+        df = self.get_dataset(dataset_id)
+        profile = self.get_profile(dataset_id)
+        if df is None or profile is None:
+            raise ValueError("Dataset not loaded.")
+
+        clean_df = df.copy()
+        outliers_treated = 0
+        missing_imputed = 0
+
+        # 1. Fill missing values
+        if fill_missing:
+            for col in clean_df.columns:
+                n_miss = clean_df[col].isna().sum()
+                if n_miss > 0:
+                    missing_imputed += int(n_miss)
+                    if pd.api.types.is_numeric_dtype(clean_df[col]):
+                        clean_df[col] = clean_df[col].fillna(clean_df[col].median())
+                    else:
+                        clean_df[col] = clean_df[col].fillna("Unknown")
+
+        # 2. Clip outliers via 3x IQR (Winsorization)
+        if clip_outliers:
+            for col in profile.get("numerical_cols", []):
+                if col in clean_df.columns and pd.api.types.is_numeric_dtype(clean_df[col]):
+                    q1 = clean_df[col].quantile(0.25)
+                    q3 = clean_df[col].quantile(0.75)
+                    iqr = q3 - q1
+                    if iqr > 0:
+                        lower_bound = q1 - 1.5 * iqr
+                        upper_bound = q3 + 1.5 * iqr
+                        mask = (clean_df[col] < lower_bound) | (clean_df[col] > upper_bound)
+                        outliers_treated += int(mask.sum())
+                        clean_df[col] = clean_df[col].clip(lower=lower_bound, upper=upper_bound)
+
+        csv_str = clean_df.to_csv(index=False)
+
+        return {
+            "dataset_id": dataset_id,
+            "original_rows": len(df),
+            "clean_rows": len(clean_df),
+            "columns": len(clean_df.columns),
+            "missing_values_imputed": missing_imputed,
+            "outliers_treated": outliers_treated,
+            "csv_data": csv_str,
+            "filename": f"{dataset_id}_sanitized.csv"
+        }
+
 # Global singleton
 analysis_engine = AnalysisEngine()

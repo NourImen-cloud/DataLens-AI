@@ -6,6 +6,10 @@ import InsightsTab from './components/InsightsTab';
 import UploadZone from './components/UploadZone';
 import ExecutiveReportModal from './components/ExecutiveReportModal';
 import SettingsModal from './components/SettingsModal';
+import AudioBriefingModal from './components/AudioBriefingModal';
+import WhatIfSimulatorModal from './components/WhatIfSimulatorModal';
+import CohortComparatorModal from './components/CohortComparatorModal';
+import DataSanitizerModal from './components/DataSanitizerModal';
 import {
   Menu,
   Sun,
@@ -16,7 +20,11 @@ import {
   Layers,
   Sparkles,
   Loader2,
-  X
+  X,
+  Volume2,
+  Zap,
+  Scale,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function App() {
@@ -39,6 +47,10 @@ export default function App() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAudioOpen, setIsAudioOpen] = useState(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isComparatorOpen, setIsComparatorOpen] = useState(false);
+  const [isSanitizerOpen, setIsSanitizerOpen] = useState(false);
   const [llmStatus, setLlmStatus] = useState(null);
 
   // Theme: default to clean light mode
@@ -67,6 +79,10 @@ export default function App() {
         setIsUploadOpen(false);
         setIsReportOpen(false);
         setIsSettingsOpen(false);
+        setIsAudioOpen(false);
+        setIsSimulatorOpen(false);
+        setIsComparatorOpen(false);
+        setIsSanitizerOpen(false);
         setSidebarOpen(false);
       }
     };
@@ -205,6 +221,10 @@ export default function App() {
         onOpenUpload={() => setIsUploadOpen(true)}
         onOpenReport={() => setIsReportOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAudio={() => setIsAudioOpen(true)}
+        onOpenSimulator={() => setIsSimulatorOpen(true)}
+        onOpenComparator={() => setIsComparatorOpen(true)}
+        onOpenSanitizer={() => setIsSanitizerOpen(true)}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -241,9 +261,46 @@ export default function App() {
               </div>
             )}
 
+            {/* 4 Feature Quick Action Buttons */}
+            <button
+              onClick={() => setIsAudioOpen(true)}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-xs font-bold transition-all shadow-2xs"
+              title="Listen to Executive Audio Briefing"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="hidden sm:inline">Voice Brief</span>
+            </button>
+
+            <button
+              onClick={() => setIsSimulatorOpen(true)}
+              className="hidden md:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors shadow-2xs"
+              title="What-If Scenario Simulator"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>What-If</span>
+            </button>
+
+            <button
+              onClick={() => setIsComparatorOpen(true)}
+              className="hidden lg:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors shadow-2xs"
+              title="Cohort & Segment Comparator"
+            >
+              <Scale className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>Compare</span>
+            </button>
+
+            <button
+              onClick={() => setIsSanitizerOpen(true)}
+              className="hidden xl:flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-colors shadow-2xs"
+              title="AI Data Sanitation & Export"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Cleanse</span>
+            </button>
+
             <button
               onClick={() => setIsReportOpen(true)}
-              className="hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-sm active:scale-95"
             >
               <FileText className="w-3.5 h-3.5" />
               <span>Executive PDF</span>
@@ -292,6 +349,10 @@ export default function App() {
                   loading={loadingQuery}
                   onOpenUpload={() => setIsUploadOpen(true)}
                   onLoadSample={handleLoadSampleByKey}
+                  onOpenAudio={() => setIsAudioOpen(true)}
+                  onOpenSimulator={() => setIsSimulatorOpen(true)}
+                  onOpenComparator={() => setIsComparatorOpen(true)}
+                  onOpenSanitizer={() => setIsSanitizerOpen(true)}
                 />
               )}
 
@@ -381,6 +442,36 @@ export default function App() {
         datasetId={activeDatasetId}
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
+      />
+
+      {/* Voice AI Audio Briefing Modal */}
+      <AudioBriefingModal
+        datasetId={activeDatasetId}
+        isOpen={isAudioOpen}
+        onClose={() => setIsAudioOpen(false)}
+      />
+
+      {/* What-If Scenario Simulator Modal */}
+      <WhatIfSimulatorModal
+        datasetId={activeDatasetId}
+        datasetProfile={datasetProfile}
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+      />
+
+      {/* Cohort Comparator Modal */}
+      <CohortComparatorModal
+        datasetId={activeDatasetId}
+        isOpen={isComparatorOpen}
+        onClose={() => setIsComparatorOpen(false)}
+      />
+
+      {/* AI Data Sanitizer Modal */}
+      <DataSanitizerModal
+        datasetId={activeDatasetId}
+        datasetProfile={datasetProfile}
+        isOpen={isSanitizerOpen}
+        onClose={() => setIsSanitizerOpen(false)}
       />
 
       {/* Settings Modal */}

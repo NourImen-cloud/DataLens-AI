@@ -1,10 +1,17 @@
 @echo off
-echo ===================================================
-echo             DATALENS AI - FAST LAUNCH
-echo   "Upload your data. Ask anything. Understand everything."
-echo ===================================================
+setlocal
+echo ================================================================
+echo                   DATALENS AI - FAST LAUNCH
+echo     "Upload your data. Ask anything. Understand everything."
+echo ================================================================
 echo.
-cd /d "%~dp0backend"
-echo Starting FastAPI Backend + Frontend on http://127.0.0.1:8000 ...
-python -m uvicorn main:app --host 127.0.0.1 --port 8000
+
+if not "%~1"=="" (
+    echo Launching on requested port %~1...
+    python "%~dp0run.py" --port %~1
+) else (
+    echo Auto-detecting available port to prevent port conflicts...
+    python "%~dp0run.py"
+)
+
 pause

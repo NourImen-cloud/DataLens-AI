@@ -50,6 +50,16 @@ class QueryRequest(BaseModel):
 class ReportRequest(BaseModel):
     dataset_id: str
 
+class SimulationRequest(BaseModel):
+    target_metric: Optional[str] = None
+    adjustment_pct: float = 10.0
+    category_col: Optional[str] = None
+
+class ComparisonRequest(BaseModel):
+    category_col: str
+    cohort_a: str
+    cohort_b: str
+
 class SettingsRequest(BaseModel):
     gemini_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
@@ -193,6 +203,72 @@ def generate_executive_report(req: ReportRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.get("/api/dataset/{dataset_id}/audio-briefing")
+def get_audio_briefing(dataset_id: str):
+    try:
+        return analysis_engine.generate_audio_briefing(dataset_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/dataset/{dataset_id}/simulate")
+def simulate_scenario(dataset_id: str, req: SimulationRequest):
+    try:
+        return analysis_engine.simulate_scenario(
+            dataset_id=dataset_id,
+            target_metric=req.target_metric,
+            adjustment_pct=req.adjustment_pct,
+            category_col=req.category_col
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/dataset/{dataset_id}/compare-options")
+def get_compare_options(dataset_id: str):
+    profile = analysis_engine.get_profile(dataset_id)
+    df = analysis_engine.get_dataset(dataset_id)
+    if not profile or df is None:
+        raise HTTPException(status_code=404, detail="Dataset not loaded.")
+    cat_cols = profile.get("categorical_cols", [])
+    options = {}
+    for c in cat_cols[:6]:
+        vals = [str(v) for v in df[c].dropna().unique()[:20]]
+        if len(vals) >= 2:
+            options[c] = vals
+    return {
+        "dataset_id": dataset_id,
+        "categorical_columns": list(options.keys()),
+        "options": options
+    }
+
+@app.post("/api/dataset/{dataset_id}/compare")
+def compare_cohorts(dataset_id: str, req: ComparisonRequest):
+    try:
+        return analysis_engine.compare_cohorts(
+            dataset_id=dataset_id,
+            category_col=req.category_col,
+            cohort_a=req.cohort_a,
+            cohort_b=req.cohort_b
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/dataset/{dataset_id}/clean-export")
+def clean_and_export(dataset_id: str, clip_outliers: bool = True, fill_missing: bool = True):
+    try:
+        res = analysis_engine.clean_and_export_dataset(dataset_id, clip_outliers, fill_missing)
+        from fastapi.responses import Response
+        return Response(
+            content=res["csv_data"],
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={res['filename']}",
+                "X-Outliers-Treated": str(res["outliers_treated"]),
+                "X-Missing-Imputed": str(res["missing_values_imputed"])
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -210,6 +286,66 @@ if os.path.exists(FRONTEND_DIST):
             return FileResponse(file_path)
         return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
+def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+def find_available_port(preferred: int = 8000, host: str = "127.0.0.1") -> int:
+    if not is_port_in_use(preferred, host):
+        return preferred
+    candidates = [8080, 8008, 8090, 8888, 8501, 8001, 8002, 8003, 8004, 8005]
+    for p in candidates:
+        if not is_port_in_use(p, host):
+            return p
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    import argparse
+    import webbrowser
+
+    parser = argparse.ArgumentParser(description="DataLens AI Platform")
+    parser.add_argument("--port", type=int, default=None, help="Port to run server on")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host address")
+    parser.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
+    args = parser.parse_args()
+
+    env_port = int(os.environ.get("PORT")) if os.environ.get("PORT") else None
+    requested_port = args.port or env_port or 8000
+
+    actual_port = find_available_port(requested_port, args.host)
+    if actual_port != requested_port:
+        print(f"\n[DataLens AI] NOTICE: Port {requested_port} is busy/in use by another service.")
+        print(f"[DataLens AI] Automatically switching to available port: {actual_port}\n")
+
+    app_url = f"http://{args.host}:{actual_port}"
+    print("=" * 60)
+    print("           DATALENS AI - INTELLIGENCE WORKSPACE")
+    print(f"       Running at: {app_url}")
+    print("=" * 60 + "\n")
+
+    import threading
+    import time
+
+    def open_browser_when_ready(url, p, h):
+        time.sleep(0.5)
+        for _ in range(30):
+            if is_port_in_use(p, h):
+                time.sleep(0.3)
+                webbrowser.open(url)
+                return
+            time.sleep(0.2)
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+
+    if not args.no_browser:
+        threading.Thread(target=open_browser_when_ready, args=(app_url, actual_port, args.host), daemon=True).start()
+
+    uvicorn.run(app, host=args.host, port=actual_port)

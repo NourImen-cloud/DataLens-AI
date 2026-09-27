@@ -12,7 +12,11 @@ import {
   X,
   Layers,
   HelpCircle,
-  ShieldCheck
+  ShieldCheck,
+  Compass,
+  Volume2,
+  Zap,
+  Scale
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -23,6 +27,10 @@ export default function Sidebar({
   onOpenUpload,
   onOpenReport,
   onOpenSettings,
+  onOpenAudio,
+  onOpenSimulator,
+  onOpenComparator,
+  onOpenSanitizer,
   isOpen,
   onClose
 }) {
@@ -137,16 +145,72 @@ export default function Sidebar({
               <FileText className="w-4 h-4 text-slate-400" />
               <span>Executive PDF Report</span>
             </button>
+          </div>
+
+          {/* AI Decision Suite */}
+          <div className="px-3 pt-3 space-y-1">
+            <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-1">
+              Decision Suite
+            </span>
+
+            <button
+              onClick={() => {
+                onOpenAudio && onOpenAudio();
+                onClose();
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-emerald-50 dark:hover:bg-slate-800 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Voice Audio Brief</span>
+              </div>
+              <span className="text-[9px] font-mono uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 px-1 py-0.2 rounded">
+                Live
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenSimulator && onOpenSimulator();
+                onClose();
+              }}
+              className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-800 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+            >
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span>What-If Simulator</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenComparator && onOpenComparator();
+                onClose();
+              }}
+              className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-cyan-50 dark:hover:bg-slate-800 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors"
+            >
+              <Scale className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+              <span>Cohort Comparator</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenSanitizer && onOpenSanitizer();
+                onClose();
+              }}
+              className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Sanitize & Export</span>
+            </button>
 
             <button
               onClick={() => {
                 onOpenUpload();
                 onClose();
               }}
-              className="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="w-full flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               <Upload className="w-4 h-4 text-slate-400" />
-              <span>Change / Upload Data</span>
+              <span>Upload / Change Data</span>
             </button>
           </div>
 
