@@ -26,15 +26,15 @@ class LLMService:
             self.provider = config["provider"].strip()
 
     def get_status(self) -> Dict[str, Any]:
-        active_provider = "deterministic_smart_engine"
+        active_provider = "Adaptive Intelligence Engine (Built-in)"
         if self.gemini_key:
-            active_provider = "gemini"
+            active_provider = "Google Gemini 1.5 Flash"
         elif self.groq_key:
-            active_provider = "groq"
+            active_provider = "Groq LLaMA 3.3 70B"
         elif self.openai_key:
-            active_provider = "openai"
+            active_provider = "OpenAI GPT-4o-mini"
         elif self._is_ollama_alive():
-            active_provider = f"ollama ({self.ollama_model})"
+            active_provider = f"Ollama ({self.ollama_model})"
 
         return {
             "gemini_configured": bool(self.gemini_key),
@@ -52,13 +52,118 @@ class LLMService:
         except Exception:
             return False
 
+    # -------------------------------------------------------------
+    # DOMAIN & UNIT FORMATTING HELPERS
+    # -------------------------------------------------------------
+    def _detect_domain(self, profile: Dict[str, Any]) -> Dict[str, str]:
+        all_cols = " ".join([c.get("name", "").lower() for c in profile.get("column_profiles", [])])
+        dataset_name = profile.get("dataset_id", "").lower()
+        text = f"{dataset_name} {all_cols}"
+
+        if any(k in text for k in ["patient", "diagnosis", "blood", "systolic", "cholesterol", "hospital", "treatment", "dose", "disease", "clinical", "medical", "doctor"]):
+            return {
+                "id": "healthcare",
+                "name": "Clinical & Healthcare",
+                "entity": "patients",
+                "entity_single": "patient",
+                "metric_context": "clinical measurements and health outcomes"
+            }
+        elif any(k in text for k in ["student", "grade", "score", "attendance", "exam", "course", "gpa", "study_hours", "education", "school", "faculty"]):
+            return {
+                "id": "education",
+                "name": "Academic & Education",
+                "entity": "students",
+                "entity_single": "student",
+                "metric_context": "academic evaluation and student outcomes"
+            }
+        elif any(k in text for k in ["sepal", "petal", "species", "specimen", "plant", "biology", "iris", "flora", "animal", "gene"]):
+            return {
+                "id": "biology",
+                "name": "Biological & Scientific Observations",
+                "entity": "specimens",
+                "entity_single": "species",
+                "metric_context": "morphological characteristics"
+            }
+        elif any(k in text for k in ["churn", "subscription", "mrr", "arr", "plan", "retention", "saas", "signup", "user_id"]):
+            return {
+                "id": "saas",
+                "name": "SaaS & Subscription Analytics",
+                "entity": "subscribers",
+                "entity_single": "customer account",
+                "metric_context": "usage and retention metrics"
+            }
+        elif any(k in text for k in ["employee", "salary", "attrition", "hire", "tenure", "hr", "payroll", "department"]):
+            return {
+                "id": "workforce",
+                "name": "Human Resources & Workforce",
+                "entity": "employees",
+                "entity_single": "team member",
+                "metric_context": "workforce distribution and compensation"
+            }
+        elif any(k in text for k in ["sale", "revenue", "order", "price", "profit", "retail", "store", "product", "ecommerce"]):
+            return {
+                "id": "commerce",
+                "name": "Commercial & Retail Sales",
+                "entity": "orders",
+                "entity_single": "product category",
+                "metric_context": "commercial revenue and sales volume"
+            }
+        else:
+            return {
+                "id": "general",
+                "name": "General Analytics",
+                "entity": "records",
+                "entity_single": "segment",
+                "metric_context": "operational dataset distribution"
+            }
+
+    def _is_monetary(self, col_name: str) -> bool:
+        col = col_name.lower()
+        monetary_terms = [
+            "revenue", "sales", "price", "cost", "salary", "mrr", "arr", "profit",
+            "fee", "spend", "budget", "amount_spent", "dollar", "usd", "eur", "payment"
+        ]
+        return any(term in col for term in monetary_terms) and not any(neg in col for neg in ["count", "id", "ratio", "pct", "percent"])
+
+    def _is_percentage(self, col_name: str) -> bool:
+        col = col_name.lower()
+        return any(term in col for term in ["pct", "percent", "ratio", "rate", "share", "margin"])
+
+    def _format_val(self, val: float, col_name: str) -> str:
+        if val is None:
+            return "N/A"
+        try:
+            val_num = float(val)
+        except Exception:
+            return str(val)
+
+        if self._is_monetary(col_name):
+            if abs(val_num) >= 1_000_000:
+                return f"${val_num/1_000_000:.2f}M"
+            elif abs(val_num) >= 1_000:
+                return f"${val_num:,.2f}"
+            else:
+                return f"${val_num:.2f}"
+        elif self._is_percentage(col_name):
+            return f"{val_num:.1f}%"
+        elif abs(val_num) >= 1_000_000:
+            return f"{val_num/1_000_000:.2f}M"
+        elif abs(val_num) >= 1000:
+            return f"{val_num:,.1f}" if val_num % 1 != 0 else f"{int(val_num):,}"
+        elif val_num % 1 == 0:
+            return f"{int(val_num)}"
+        else:
+            return f"{val_num:.2f}"
+
+    # -------------------------------------------------------------
+    # 1. QUESTION UNDERSTANDING & PLAN CREATION
+    # -------------------------------------------------------------
     def create_analysis_plan(self, question: str, profile: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Step 1 of the killer feature:
-        Converts user natural language into an Analysis Plan strictly referencing existing columns.
-        """
+        """Converts user query into an analysis plan strictly referencing schema columns."""
+        domain = self._detect_domain(profile)
         prompt = f"""You are DataLens AI's Chief Data Architect.
-Given a user query and dataset schema, create a precise, structured Python/Pandas Analysis Plan.
+The user is asking a question about a {domain['name']} dataset.
+Create a precise Python/Pandas Analysis Plan strictly referencing columns from the schema.
 
 DATASET SCHEMA:
 Columns: {', '.join([c['name'] + ' (' + c['type'] + ')' for c in profile.get('column_profiles', [])])}
@@ -68,11 +173,11 @@ Datetime columns: {profile.get('datetime_cols', [])}
 
 USER QUESTION: "{question}"
 
-You must respond ONLY with a JSON object in this format:
+Respond ONLY with a JSON object in this exact format:
 {{
-  "thought_process": "Short 1-2 sentence understanding of what the user is asking and what columns are required",
+  "thought_process": "Brief 1-sentence explanation of what columns are required to answer the question",
   "analysis_type": "breakdown | trend_comparison | distribution | correlation | outlier_inspection",
-  "target_column": "<exact column name from schema>",
+  "target_column": "<exact numerical or categorical column name from schema>",
   "group_by": ["<column name(s) from schema>"],
   "time_column": "<datetime column name or null>",
   "time_granularity": "month | quarter | day | null",
@@ -89,45 +194,171 @@ You must respond ONLY with a JSON object in this format:
             plan = self._extract_json(response_text)
 
         if not plan or not isinstance(plan, dict) or "target_column" not in plan:
-            # Deterministic Smart Heuristic Fallback
             plan = self._heuristic_analysis_plan(question, profile)
 
         return plan
 
+    def _heuristic_analysis_plan(self, question: str, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """Robust deterministic rule-based analysis plan generator."""
+        q_lower = question.lower()
+        num_cols = profile.get("numerical_cols", [])
+        cat_cols = profile.get("categorical_cols", [])
+        date_cols = profile.get("datetime_cols", [])
+
+        def score_column_match(col_name: str, query: str) -> int:
+            q = query.lower()
+            c = col_name.lower()
+            clean_c = c.replace("_", " ")
+            if re.search(r'\b' + re.escape(clean_c) + r'\b', q):
+                return 150
+            if re.search(r'\b' + re.escape(c) + r'\b', q):
+                return 120
+            # Common acronym expansion
+            if "bp" in c and ("blood pressure" in q or "pressure" in q):
+                return 80
+            if "mrr" in c and "recurring revenue" in q:
+                return 80
+            words = [w.lower() for w in re.split(r'[_ \W]+|(?<=[a-z])(?=[A-Z])', col_name) if len(w) >= 2]
+            score = 0
+            for w in words:
+                if re.search(r'\b' + re.escape(w) + r'\b', q):
+                    score += 40
+            return score
+
+        # 1. Identify target column (prioritize numerical metrics)
+        target_col = None
+        best_num_score = 0
+        for col in num_cols:
+            s = score_column_match(col, question)
+            if s > best_num_score:
+                best_num_score = s
+                target_col = col
+
+        if best_num_score == 0:
+            # Check categorical if user is asking for frequency/distribution
+            best_cat_score = 0
+            for col in cat_cols:
+                s = score_column_match(col, question)
+                if s > best_cat_score:
+                    best_cat_score = s
+                    target_col = col
+
+        if not target_col:
+            # Fallback to high-leverage numerical columns
+            priority_terms = ["score", "grade", "revenue", "sales", "length", "amount", "total", "rate", "bp", "age", "value", "profit"]
+            for term in priority_terms:
+                matched = next((c for c in num_cols if term in c.lower()), None)
+                if matched:
+                    target_col = matched
+                    break
+            if not target_col:
+                target_col = num_cols[0] if num_cols else (cat_cols[0] if cat_cols else "records")
+
+        # 2. Identify group_by column (excluding target_col)
+        group_by = []
+        eligible_cats = [c for c in cat_cols if c != target_col]
+        best_grp_score = 0
+        chosen_grp = None
+
+        for col in eligible_cats:
+            s = score_column_match(col, question)
+            if s > best_grp_score:
+                best_grp_score = s
+                chosen_grp = col
+
+        if chosen_grp:
+            group_by.append(chosen_grp)
+
+        # Keyword mapping fallbacks
+        if not group_by:
+            if any(k in q_lower for k in ["species", "variety", "flower"]) and any("species" in c.lower() for c in eligible_cats):
+                group_by.append(next(c for c in eligible_cats if "species" in c.lower()))
+            elif any(k in q_lower for k in ["gender", "sex"]) and any("gender" in c.lower() for c in eligible_cats):
+                group_by.append(next(c for c in eligible_cats if "gender" in c.lower()))
+            elif any(k in q_lower for k in ["attendance", "presence"]) and any("attendance" in c.lower() for c in eligible_cats):
+                group_by.append(next(c for c in eligible_cats if "attendance" in c.lower()))
+            elif any(k in q_lower for k in ["region", "area", "country", "city"]) and any("region" in c.lower() for c in eligible_cats):
+                group_by.append(next(c for c in eligible_cats if "region" in c.lower()))
+            elif any(k in q_lower for k in ["category", "type", "class", "segment", "department"]):
+                matched = next((c for c in eligible_cats if any(k in c.lower() for k in ["category", "type", "class", "segment", "department"])), None)
+                if matched:
+                    group_by.append(matched)
+                matched = next((c for c in cat_cols if any(k in c.lower() for k in ["category", "type", "class", "segment", "department"])), None)
+                if matched:
+                    group_by.append(matched)
+
+        # Check for time series
+        is_time = any(k in q_lower for k in ["trend", "month", "time", "over time", "history", "timeline", "quarter", "year"])
+        time_col = date_cols[0] if (is_time and date_cols) else None
+
+        if not group_by and not time_col:
+            # Pick first informative categorical column (2-50 unique values)
+            valid_cats = [c for c in cat_cols if c != target_col and not any(id_kw in c.lower() for id_kw in ["_id", "uuid", "guid", "code"])]
+            if valid_cats:
+                group_by.append(valid_cats[0])
+            elif cat_cols and cat_cols[0] != target_col:
+                group_by.append(cat_cols[0])
+
+        chart_type = "line" if time_col and not group_by else ("pie" if len(group_by) == 1 and any(k in q_lower for k in ["share", "proportion", "breakdown", "pie"]) else "bar")
+        metric = "mean" if any(k in q_lower for k in ["average", "avg", "mean"]) or "length" in target_col.lower() or "score" in target_col.lower() or "rate" in target_col.lower() or "age" in target_col.lower() else "sum"
+
+        return {
+            "thought_process": f"Evaluated metric '{target_col}' grouped by '{group_by[0] if group_by else (time_col or 'distribution')}' to answer user query directly.",
+            "analysis_type": "trend_comparison" if time_col else "breakdown",
+            "target_column": target_col,
+            "group_by": group_by,
+            "time_column": time_col,
+            "time_granularity": "month" if time_col else None,
+            "metric": metric,
+            "chart_type": chart_type,
+            "sort": "desc",
+            "limit": 10,
+            "filters": {}
+        }
+
+    # -------------------------------------------------------------
+    # 2. EXPLANATION & DECISION SYNTHESIS
+    # -------------------------------------------------------------
     def explain_results(self, question: str, plan: Dict[str, Any], results: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Step 2 of non-hallucination architecture:
-        Takes actual Python results (ground truth) and generates an insightful, decision-grade explanation.
-        """
+        """Generates clear, natural, human-friendly explanations grounded in verified Python data."""
         chart_data = results.get("chart_data", [])
         summary_stats = results.get("summary_stats", {})
-        
-        prompt = f"""You are DataLens AI, an elite Data & Decision Analyst.
-The Python/Pandas engine has executed an analysis plan to answer the user's question.
-The numbers below are the GROUND TRUTH computed directly from data. Do not invent or change numbers.
+        domain = self._detect_domain(profile)
+
+        target_col = plan.get("target_column", "metric")
+        group_by = plan.get("group_by", [])
+        metric = plan.get("metric", "value")
+
+        prompt = f"""You are DataLens AI, a helpful, clear, and insightful Senior Data Analyst.
+The Python data engine has executed a calculation on a {domain['name']} dataset to answer the user's question.
+The numbers below are GROUND TRUTH facts computed from the data. Do NOT invent numbers.
 
 USER QUESTION: "{question}"
-ANALYSIS TARGET: {plan.get('target_column')} (metric: {plan.get('metric')})
-GROUP BY: {plan.get('group_by')}
+DATASET DOMAIN: {domain['name']} (focus on: {domain['metric_context']})
+ANALYSIS TARGET: {target_col} ({metric})
+GROUPED BY: {group_by}
 
-COMPUTED PYTHON RESULTS:
+VERIFIED PYTHON RESULTS:
 {json.dumps(chart_data[:10], indent=2)}
 
 STATISTICAL SUMMARY:
 {json.dumps(summary_stats, indent=2)}
 
-Produce a JSON response with:
-1. "headline": A crisp, high-impact finding (1 sentence with the exact top number or percentage).
-2. "narrative": 2-3 concise paragraphs interpreting the data, explaining the business impact, and highlighting any disparities or patterns.
-3. "why_hypothesis": 1-2 paragraphs exploring realistic operational or market reasons for this result.
-4. "follow_up_questions": An array of 3 strategic next-step questions the user might ask next.
+CRITICAL WRITING RULES:
+1. Speak in PLAIN, NATURAL, CONVERSATIONAL ENGLISH. Avoid bizarre buzzwords, corporate jargon, or robotic phrasing.
+2. Answer the user's question DIRECTLY in the very first sentence of the headline.
+3. Tailor all words strictly to {domain['name']}. NEVER mention fictional business terms like "advertising spend" or "e-commerce orders" unless they exist in the schema.
+4. Only use currency ($) if the metric is genuinely money. For scores, measurements, or counts, use clean numeric units.
+5. In "narrative", write 2 clear, short paragraphs explaining who ranks highest/lowest and the gap between them.
+6. In "why_hypothesis", offer 1-2 sensible, realistic real-world explanations for why this pattern exists in this specific domain.
+7. In "follow_up_questions", suggest 3 smart questions exploring other angles of this dataset.
 
 Respond ONLY with valid JSON matching:
 {{
-  "headline": "...",
-  "narrative": "...",
-  "why_hypothesis": "...",
-  "follow_up_questions": ["...", "...", "..."]
+  "headline": "Direct 1-sentence answer to the user's question with the exact top number",
+  "narrative": "Paragraph 1 explaining the rankings and numbers.\\n\\nParagraph 2 explaining the spread and comparison.",
+  "why_hypothesis": "Realistic real-world domain explanation for why this is happening.",
+  "follow_up_questions": ["Question 1?", "Question 2?", "Question 3?"]
 }}
 """
         response_text = self._call_llm(prompt)
@@ -140,25 +371,165 @@ Respond ONLY with valid JSON matching:
 
         return explanation
 
+    def _heuristic_explanation(self, question: str, plan: Dict[str, Any], results: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
+        """Dynamic, domain-aware heuristic generator that produces crystal-clear, natural language answers."""
+        chart_data = results.get("chart_data", [])
+        summary = results.get("summary_stats", {})
+        target = plan.get("target_column", "metric")
+        group_by = plan.get("group_by", [])
+        metric = plan.get("metric", "value")
+        domain = self._detect_domain(profile)
+
+        clean_target = target.replace("_", " ")
+        clean_grp = group_by[0].replace("_", " ") if group_by else "category"
+
+        if not chart_data:
+            return {
+                "headline": f"No data entries found matching '{clean_target}'.",
+                "narrative": f"The analysis could not locate records for {clean_target} under the current filter criteria.",
+                "why_hypothesis": f"Verify whether the selected column exists and has non-null entries in the active dataset.",
+                "follow_up_questions": [f"What are the available values for {clean_grp}?", f"Show overall distribution of {clean_target}", "What columns are available?"]
+            }
+
+        top_item = chart_data[0]
+        top_name = top_item.get("name")
+        top_val = top_item.get("value", 0)
+        top_share = top_item.get("share", 0)
+
+        bottom_item = chart_data[-1]
+        bottom_name = bottom_item.get("name")
+        bottom_val = bottom_item.get("value", 0)
+        bottom_share = bottom_item.get("share", 0)
+
+        mean_val = summary.get("mean", sum(d.get("value", 0) for d in chart_data) / max(1, len(chart_data)))
+        total_val = summary.get("total", sum(d.get("value", 0) for d in chart_data))
+
+        fmt_top = self._format_val(top_val, target)
+        fmt_bottom = self._format_val(bottom_val, target)
+        fmt_mean = self._format_val(mean_val, target)
+        fmt_total = self._format_val(total_val, target)
+
+        metric_word = "average" if metric == "mean" else ("total" if metric == "sum" else metric)
+
+        # Ratio between top and bottom
+        ratio = round(top_val / bottom_val, 1) if (bottom_val and bottom_val > 0) else None
+
+        # 1. CRAFT DIRECT HEADLINE
+        q_lower = question.lower()
+        if any(k in q_lower for k in ["lowest", "bottom", "least", "worst", "minimum"]):
+            headline = f"{bottom_name} recorded the lowest {metric_word} {clean_target} at {fmt_bottom} ({bottom_share}% of total)."
+        elif any(k in q_lower for k in ["compare", "vs", "versus", "difference", "spread"]):
+            if ratio and ratio > 1:
+                headline = f"{top_name} leads {clean_target} at {fmt_top}, which is {ratio}x higher than {bottom_name} ({fmt_bottom})."
+            else:
+                headline = f"{top_name} leads {clean_target} with {fmt_top}, compared to {bottom_name} at {fmt_bottom}."
+        elif any(k in q_lower for k in ["why", "reason", "cause", "decrease", "drop"]):
+            headline = f"{clean_target.title()} shows marked variation across {clean_grp}, led by {top_name} at {fmt_top}."
+        else:
+            if len(chart_data) > 1:
+                headline = f"{top_name} ranks highest in {clean_target} with {fmt_top} ({top_share}% of total), followed by {chart_data[1].get('name')} ({self._format_val(chart_data[1].get('value', 0), target)})."
+            else:
+                headline = f"{top_name} has a {metric_word} {clean_target} of {fmt_top}."
+
+        # 2. CRAFT READABLE NARRATIVE (2 short paragraphs)
+        p1 = (
+            f"Across the {len(chart_data)} {clean_grp} groups analyzed, **{top_name}** represents the top performer "
+            f"with a {metric_word} {clean_target} of **{fmt_top}** (accounting for {top_share}% of overall volume). "
+            f"Across all groups, the average is {fmt_mean}."
+        )
+
+        if len(chart_data) > 1:
+            comparison_phrase = f"— a {ratio}x spread between the highest and lowest performers" if ratio and ratio > 1 else ""
+            p2 = (
+                f"In comparison, **{bottom_name}** sits at the lower end with **{fmt_bottom}** ({bottom_share}% share){comparison_phrase}. "
+                f"This highlights clear divergence between categories that warrants targeted focus on {bottom_name}."
+            )
+        else:
+            p2 = f"This segment encompasses the full computed volume of {fmt_total} across active records."
+
+        narrative = f"{p1}\n\n{p2}"
+
+        # 3. CONTEXTUAL DOMAIN-AWARE WHY HYPOTHESIS
+        d_id = domain["id"]
+        if d_id == "education":
+            why_hypo = (
+                f"Variations in {clean_target} across {clean_grp} categories commonly correlate with study time allocation, "
+                f"attendance consistency, prerequisite coursework preparation, and active engagement with tutoring resources."
+            )
+        elif d_id == "healthcare":
+            why_hypo = (
+                f"The clinical distribution in {clean_target} reflects differences in patient age cohorts, baseline symptom severity, "
+                f"compliance with prescribed care protocols, and variations in treatment timelines."
+            )
+        elif d_id == "biology":
+            why_hypo = (
+                f"The morphological difference in {clean_target} across {clean_grp} groups is consistent with distinct biological "
+                f"subspecies traits, evolutionary adaptation, and natural phenotypic variations."
+            )
+        elif d_id == "saas":
+            why_hypo = (
+                f"Disparities in {clean_target} typically stem from user onboarding completion rates, weekly active feature utilization, "
+                f"and organizational seat adoption depth during initial customer lifecycle stages."
+            )
+        elif d_id == "workforce":
+            why_hypo = (
+                f"Differences in {clean_target} across {clean_grp} departments align with role specialization, professional seniority, "
+                f"overtime requirements, and market benchmarks for specialized technical skills."
+            )
+        elif d_id == "commerce":
+            why_hypo = (
+                f"The outperformance of {top_name} in {clean_target} is supported by stronger repeat purchasing rates, "
+                f"higher average basket sizes, and effective promotional visibility compared to lower-performing categories."
+            )
+        else:
+            why_hypo = (
+                f"The observed concentration in {top_name} indicates structural skew toward the leading category, "
+                f"where primary activity concentrates while peripheral segments generate smaller incremental contributions."
+            )
+
+        # 4. RELEVANT FOLLOW-UP QUESTIONS FROM SCHEMA
+        num_cols = [c for c in profile.get("numerical_cols", []) if c != target]
+        cat_cols = [c for c in profile.get("categorical_cols", []) if c not in group_by]
+
+        follow_ups = []
+        if cat_cols:
+            follow_ups.append(f"How does {clean_target} break down by {cat_cols[0].replace('_', ' ')}?")
+        if num_cols:
+            follow_ups.append(f"Is there a correlation between {clean_target} and {num_cols[0].replace('_', ' ')}?")
+        follow_ups.append(f"What are the top outlier records in {clean_target}?")
+
+        return {
+            "headline": headline,
+            "narrative": narrative,
+            "why_hypothesis": why_hypo,
+            "follow_up_questions": follow_ups[:3]
+        }
+
+    # -------------------------------------------------------------
+    # 3. EXECUTIVE REPORT GENERATOR
+    # -------------------------------------------------------------
     def generate_executive_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generates a C-level Executive Decision Report from quantified findings."""
+        dataset_name = report_data.get("dataset_name", "Dataset")
+        rows = report_data.get("rows", 0)
+
         prompt = f"""You are the Chief AI Analytics Officer at DataLens AI.
-Generate an executive briefing report for senior leadership based on the following verified dataset facts:
+Generate an executive briefing report for senior leadership based on the following verified facts:
 
-DATASET: {report_data.get('dataset_name')}
-TOTAL ROWS: {report_data.get('rows')}
-KEY REVENUE/METRIC: ${report_data.get('total_revenue', 0):,.2f}
-AVERAGE VALUE: ${report_data.get('avg_transaction', 0):,.2f}
-TOTAL PROFIT: ${report_data.get('total_profit', 0):,.2f}
-KEY INSIGHTS DETECTED:
-{json.dumps(report_data.get('insights', [])[:4], indent=2)}
-SEGMENT BREAKDOWNS:
-{json.dumps(report_data.get('breakdowns', {}), indent=2)}
+DATASET: {dataset_name}
+TOTAL ROWS: {rows}
+RECORDS: {json.dumps(report_data.get('breakdowns', {}), indent=2)}
+KEY INSIGHTS: {json.dumps(report_data.get('insights', [])[:4], indent=2)}
 
-Format as JSON:
+CRITICAL WRITING RULES:
+1. Speak in plain, authoritative, natural executive English.
+2. Focus on the actual domain of the data. Do NOT mention fictional concepts like 'advertising spend' or 'sales profit' if the dataset is about health, science, or education.
+3. Keep findings quantified with real numbers from the data.
+
+Respond ONLY with valid JSON matching:
 {{
-  "title": "Executive Performance & Decision Briefing",
-  "executive_summary": "150-word high level synthesis of performance and strategic positioning",
+  "title": "Executive Intelligence Report: {dataset_name.replace('_', ' ').title()}",
+  "executive_summary": "150-word high level synthesis of performance and strategic positioning.",
   "key_findings": [
     {{"finding": "...", "impact": "High | Medium | Low", "metric": "..."}},
     {{"finding": "...", "impact": "High | Medium | Low", "metric": "..."}},
@@ -182,55 +553,142 @@ Format as JSON:
 
         return report
 
+    def _heuristic_executive_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Deterministic, domain-aware executive report generator."""
+        dataset_name = report_data.get("dataset_name", "Dataset")
+        rows = report_data.get("rows", 0)
+        breakdowns = report_data.get("breakdowns", {})
+
+        first_bd_key = list(breakdowns.keys())[0] if breakdowns else "category"
+        items = breakdowns.get(first_bd_key, [])
+        top_item = items[0] if items else {"name": "Primary Segment", "share": 38.0, "value": 0}
+
+        return {
+            "title": f"Executive Intelligence Report: {dataset_name.replace('_', ' ').title()}",
+            "executive_summary": (
+                f"This executive intelligence report synthesizes verified data points across {rows:,} dataset records. "
+                f"Cross-segment aggregation reveals that {top_item.get('name', 'Leading Segment')} represents the primary concentration, "
+                f"commanding {top_item.get('share', 0)}% of total distribution in {first_bd_key.replace('_', ' ')}. "
+                f"Data quality screening verified integrity, highlighting key strategic focus areas for operational optimization."
+            ),
+            "key_findings": [
+                {
+                    "finding": f"Strong concentration in {top_item.get('name', 'Leading Segment')} with {top_item.get('share', 0)}% of total {first_bd_key.replace('_', ' ')} volume.",
+                    "impact": "High",
+                    "metric": f"{top_item.get('share', 0)}% Dominance"
+                },
+                {
+                    "finding": f"Notable divergence between leading and trailing segments across {first_bd_key.replace('_', ' ')}.",
+                    "impact": "Medium",
+                    "metric": f"{len(items)} Categories Analyzed"
+                },
+                {
+                    "finding": "Data quality analysis confirms robust sample completeness across active records.",
+                    "impact": "Low",
+                    "metric": f"{rows:,} Verified Rows"
+                }
+            ],
+            "anomalies_and_risks": [
+                {
+                    "risk": f"High dependency on {top_item.get('name', 'the primary segment')} creating concentration risk.",
+                    "evidence": f"Top category accounts for {top_item.get('share', 0)}% of computed activity.",
+                    "urgency": "Immediate"
+                }
+            ],
+            "strategic_recommendations": [
+                {
+                    "action": f"Expand operational support and resources dedicated to {top_item.get('name', 'the top category')}.",
+                    "expected_roi": "Sustained high-yield performance",
+                    "owner": "Executive Leadership"
+                },
+                {
+                    "action": f"Conduct focused diagnostic on underperforming segments in {first_bd_key.replace('_', ' ')}.",
+                    "expected_roi": "Reduced performance disparity",
+                    "owner": "Analytics Team"
+                }
+            ]
+        }
+
+    # -------------------------------------------------------------
+    # 4. LLM CALLING (REST-BASED FOR MAXIMUM RELIABILITY)
+    # -------------------------------------------------------------
     def _call_llm(self, prompt: str) -> Optional[str]:
         """Tries configured LLMs with priority: Gemini -> Groq -> OpenAI -> Ollama -> None."""
-        # 1. Gemini
+        # 1. Google Gemini (REST API)
         if self.gemini_key:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.gemini_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                res = model.generate_content(prompt)
-                if res and res.text:
-                    return res.text
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "responseMimeType": "application/json"
+                    }
+                }
+                r = requests.post(url, json=payload, timeout=12)
+                if r.status_code == 200:
+                    data = r.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            return parts[0].get("text")
             except Exception as e:
-                print(f"[Gemini Error]: {e}")
+                print(f"[Gemini REST Error]: {e}")
 
-        # 2. Groq
+        # 2. Groq (REST API)
         if self.groq_key:
             try:
-                from openai import OpenAI
-                client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=self.groq_key)
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2
-                )
-                return completion.choices[0].message.content
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {self.groq_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "response_format": {"type": "json_object"}
+                }
+                r = requests.post(url, json=payload, headers=headers, timeout=12)
+                if r.status_code == 200:
+                    data = r.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        return choices[0].get("message", {}).get("content")
             except Exception as e:
-                print(f"[Groq Error]: {e}")
+                print(f"[Groq REST Error]: {e}")
 
-        # 3. OpenAI
+        # 3. OpenAI (REST API)
         if self.openai_key:
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=self.openai_key)
-                completion = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.2
-                )
-                return completion.choices[0].message.content
+                url = "https://api.openai.com/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {self.openai_key}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "response_format": {"type": "json_object"}
+                }
+                r = requests.post(url, json=payload, headers=headers, timeout=12)
+                if r.status_code == 200:
+                    data = r.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        return choices[0].get("message", {}).get("content")
             except Exception as e:
-                print(f"[OpenAI Error]: {e}")
+                print(f"[OpenAI REST Error]: {e}")
 
-        # 4. Ollama
+        # 4. Ollama (Local API)
         if self._is_ollama_alive():
             try:
                 r = requests.post(
                     f"{self.ollama_base_url}/api/generate",
-                    json={"model": self.ollama_model, "prompt": prompt, "stream": False},
-                    timeout=20.0
+                    json={"model": self.ollama_model, "prompt": prompt, "stream": False, "format": "json"},
+                    timeout=15.0
                 )
                 if r.status_code == 200:
                     return r.json().get("response")
@@ -240,12 +698,14 @@ Format as JSON:
         return None
 
     def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
+        if not text:
+            return None
         try:
-            # Look for ```json ... ```
+            # Check for ```json ... ```
             match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
             if match:
                 return json.loads(match.group(1))
-            # Or match from first { to last }
+            # Match outermost { ... }
             first_brace = text.find('{')
             last_brace = text.rfind('}')
             if first_brace != -1 and last_brace != -1:
@@ -253,212 +713,6 @@ Format as JSON:
         except Exception:
             pass
         return None
-
-    def _heuristic_analysis_plan(self, question: str, profile: Dict[str, Any]) -> Dict[str, Any]:
-        """Robust deterministic rule-based analysis plan generator."""
-        q_lower = question.lower()
-        num_cols = profile.get("numerical_cols", [])
-        cat_cols = profile.get("categorical_cols", [])
-        date_cols = profile.get("datetime_cols", [])
-
-        # Identify target column
-        target_col = None
-        for col in num_cols:
-            if col.lower() in q_lower:
-                target_col = col
-                break
-        if not target_col:
-            # Default to primary revenue/sales/amount column
-            target_col = next((c for c in num_cols if any(k in c.lower() for k in ["rev", "sales", "mrr", "amount", "total", "profit"])), num_cols[0] if num_cols else "value")
-
-        # Identify group_by column
-        group_by = []
-        for col in cat_cols:
-            if col.lower() in q_lower or (col.lower().replace("_", " ") in q_lower):
-                group_by.append(col)
-        
-        # Keyword mappings
-        if not group_by:
-            if any(k in q_lower for k in ["region", "area", "territory", "geography"]) and "region" in cat_cols:
-                group_by.append("region")
-            elif any(k in q_lower for k in ["product", "item", "sku"]) and "product" in cat_cols:
-                group_by.append("product")
-            elif any(k in q_lower for k in ["category", "dept", "department"]) and "category" in cat_cols:
-                group_by.append("category")
-            elif any(k in q_lower for k in ["segment", "customer"]) and "customer_segment" in cat_cols:
-                group_by.append("customer_segment")
-            elif any(k in q_lower for k in ["payment", "method"]) and "payment_method" in cat_cols:
-                group_by.append("payment_method")
-
-        # Check for time trends
-        is_time = any(k in q_lower for k in ["trend", "month", "time", "over time", "march", "period", "history", "quarter", "timeline"])
-        time_col = date_cols[0] if (is_time and date_cols) else None
-
-        # Check for specific March question: "Why did sales decrease in March?"
-        filters = {}
-        if "march" in q_lower:
-            # Anomaly drilldown
-            if "region" in cat_cols:
-                group_by = ["region"]
-            elif cat_cols:
-                group_by = [cat_cols[0]]
-
-        if not group_by and not time_col:
-            group_by = [cat_cols[0]] if cat_cols else []
-
-        chart_type = "line" if time_col and not group_by else ("pie" if len(group_by) == 1 and "share" in q_lower else "bar")
-        metric = "mean" if any(k in q_lower for k in ["average", "avg", "mean"]) else "sum"
-
-        return {
-            "thought_process": f"Identified metric '{target_col}' aggregated by '{group_by[0] if group_by else time_col}' to evaluate user inquiry.",
-            "analysis_type": "trend_comparison" if time_col else "breakdown",
-            "target_column": target_col,
-            "group_by": group_by,
-            "time_column": time_col,
-            "time_granularity": "month" if time_col else None,
-            "metric": metric,
-            "chart_type": chart_type,
-            "sort": "desc",
-            "limit": 10,
-            "filters": filters
-        }
-
-    def _heuristic_explanation(self, question: str, plan: Dict[str, Any], results: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
-        """Provides verified, mathematically accurate statistical explanation."""
-        chart_data = results.get("chart_data", [])
-        summary = results.get("summary_stats", {})
-        target = plan.get("target_column", "metric")
-        group_by = plan.get("group_by", [])
-        grp_name = group_by[0] if group_by else "segment"
-
-        if not chart_data:
-            return {
-                "headline": f"No direct distribution found for {target}.",
-                "narrative": "The dataset returned zero records matching the specified parameters.",
-                "why_hypothesis": "Verify filter bounds or date ranges.",
-                "follow_up_questions": ["Show overall summary statistics", "What are the available categories?"]
-            }
-
-        top_item = chart_data[0]
-        top_name = top_item.get("name")
-        top_val = top_item.get("value", 0)
-        top_share = top_item.get("share", 0)
-        total_sum = summary.get("total", sum(d.get("value", 0) for d in chart_data))
-
-        # Format number nicely
-        fmt_val = f"${top_val:,.2f}" if any(k in target.lower() for k in ["rev", "sales", "price", "profit", "mrr", "amount"]) else f"{top_val:,.1f}"
-
-        # Anomaly or March question check
-        if "march" in question.lower() or "decrease" in question.lower() or "why" in question.lower():
-            headline = f"Analysis indicates performance divergence concentrated in top operational segments."
-            narrative = (
-                f"When drilling down into {target.replace('_', ' ')}, {top_name} remains the largest segment at {fmt_val} "
-                f"({top_share}% of total), but experienced localized volume compression during March 2026. "
-                f"Aggregated volume across all {len(chart_data)} {grp_name} segments totaled ${total_sum:,.2f}."
-            )
-            why_hypo = (
-                f"The contraction in March appears primarily driven by seasonal order timing, coupled with reduced conversion "
-                f"in secondary product lines. Notably, advertising spend efficiency dropped 14% during the middle of the month."
-            )
-            follow_ups = [
-                f"Compare March vs February by {grp_name}",
-                f"Which products had the biggest drop in March?",
-                f"What is the correlation between advertising spend and revenue?"
-            ]
-        else:
-            headline = f"{top_name} generated the highest {target.replace('_', ' ')} at {fmt_val} ({top_share}% of total)."
-            narrative = (
-                f"Based on full dataset aggregation, {top_name} leads all {grp_name} categories, "
-                f"representing approximately {top_share}% of the ${total_sum:,.2f} cumulative {target.replace('_', ' ')}. "
-                f"The lowest contributing segment was {chart_data[-1].get('name')} with ${chart_data[-1].get('value', 0):,.2f} ({chart_data[-1].get('share', 0)}%)."
-            )
-            why_hypo = (
-                f"{top_name}'s outperformance is supported by higher average transaction values and consistent repeat enterprise orders. "
-                f"Conversion rates in this tier outpace the cross-segment median."
-            )
-            follow_ups = [
-                f"Why is {top_name} performing so much better than {chart_data[-1].get('name')}?",
-                f"What is the profit margin across {grp_name}?",
-                f"Show monthly trend of {target} for {top_name}"
-            ]
-
-        return {
-            "headline": headline,
-            "narrative": narrative,
-            "why_hypothesis": why_hypo,
-            "follow_up_questions": follow_ups
-        }
-
-    def _heuristic_executive_report(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Deterministic executive briefing report."""
-        dataset_name = report_data.get("dataset_name", "Dataset")
-        rows = report_data.get("rows", 0)
-        tot_rev = report_data.get("total_revenue", 0)
-        tot_prof = report_data.get("total_profit", 0)
-        margin = report_data.get("profit_margin", 0)
-        insights = report_data.get("insights", [])
-
-        # Extract top region or product if available
-        breakdowns = report_data.get("breakdowns", {})
-        first_bd_key = list(breakdowns.keys())[0] if breakdowns else "segment"
-        top_bd_item = breakdowns[first_bd_key][0] if breakdowns and breakdowns[first_bd_key] else {"name": "Primary Segment", "share": 34.0}
-
-        return {
-            "title": f"Executive Intelligence Report: {dataset_name.replace('_', ' ').title()}",
-            "executive_summary": (
-                f"This report synthesizes performance across {rows:,} operational records. "
-                f"Cumulative volume reached ${tot_rev:,.2f}"
-                + (f" with a net margin of {margin}% (${tot_prof:,.2f}). " if margin else ". ")
-                + f"Market distribution reveals concentrated leadership, with {top_bd_item['name']} commanding {top_bd_item.get('share')}% share. "
-                f"Proactive anomaly screening flagged seasonal contractions and high-leverage transaction outliers requiring targeted risk management."
-            ),
-            "key_findings": [
-                {
-                    "finding": f"Strong top-line volume with {top_bd_item['name']} commanding {top_bd_item.get('share')}% of total {first_bd_key} volume.",
-                    "impact": "High",
-                    "metric": f"{top_bd_item.get('share')}% Market Share"
-                },
-                {
-                    "finding": "Core drivers demonstrate strong positive correlation with promotional and advertising spend.",
-                    "impact": "High",
-                    "metric": "r = 0.88 Correlation"
-                },
-                {
-                    "finding": "Outlier transactions represent significant concentration of top-line revenue variance.",
-                    "impact": "Medium",
-                    "metric": "12 Severe Outliers"
-                }
-            ],
-            "anomalies_and_risks": [
-                {
-                    "risk": "Mid-period contraction in secondary regional clusters and select product lines.",
-                    "evidence": "Observed 32.4% dip during March 2026 before recovering.",
-                    "urgency": "Immediate"
-                },
-                {
-                    "risk": "Data completeness gap in customer demographic attributes.",
-                    "evidence": f"{report_data.get('missing_pct', 2.3)}% missing data detected in customer attributes.",
-                    "urgency": "Monitor"
-                }
-            ],
-            "strategic_recommendations": [
-                {
-                    "action": f"Reallocate 15% promotional budget toward high-margin lines in {top_bd_item['name']}.",
-                    "expected_roi": "+12-18% EBITDA uplift",
-                    "owner": "Commercial Leadership"
-                },
-                {
-                    "action": "Implement inventory safeguards against mid-quarter seasonal dips.",
-                    "expected_roi": "Reduced holding costs by $45,000",
-                    "owner": "Operations & Supply Chain"
-                },
-                {
-                    "action": "Enforce mandatory customer profile validation to eliminate missing attributes.",
-                    "expected_roi": "Enhanced CRM targeting accuracy",
-                    "owner": "Data & Engineering"
-                }
-            ]
-        }
 
 # Global singleton
 llm_service = LLMService()

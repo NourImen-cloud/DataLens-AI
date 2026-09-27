@@ -375,8 +375,12 @@ class AnalysisEngine:
             
             if len(effective_groups) == 1:
                 grp_col = effective_groups[0]
-                grouped = working_df.groupby(grp_col)[target_col].agg(agg_func).reset_index()
-                grouped.columns = ["name", "value"]
+                if grp_col == target_col:
+                    grouped = working_df.groupby(grp_col).size().reset_index(name="value")
+                    grouped.columns = ["name", "value"]
+                else:
+                    grouped = working_df.groupby(grp_col)[target_col].agg(agg_func).reset_index()
+                    grouped.columns = ["name", "value"]
                 
                 # Sort
                 if plan.get("sort", "desc") == "desc" and grp_col != "period":
