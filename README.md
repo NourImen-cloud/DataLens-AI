@@ -1,5 +1,4 @@
-# DataLens AI 🔍⚡
-> **GOMYCODE Hackathon: “Come Build with AI” (27 September 2026)**  
+# DataLens AI 🔍⚡  
 > *“Turn any dataset into verified decisions through conversation.”*  
 > *“Upload your data. Ask anything. Understand everything.”*
 
@@ -76,83 +75,7 @@ flowchart LR
 │ - Python GroundTruth│ - Donut Breakdown │ - Severe Outlier Alerts      │
 │ - Code Transparency │ - Records Table   │ - Pearson Drivers (|r|>=0.45)│
 └─────────────────────┴───────────────────┴──────────────────────────────┘
-```
 
----
-
-## ⚡ Quick Start (Local Launch with Zero Port Conflicts)
-
-DataLens AI includes **Automatic Port Collision Resolution** so it never crashes with `[WinError 10048] Address already in use`.
-
-### Method A: One-Click Launch (Recommended)
-Double-click [`run_app.bat`](file:///c:/Users/lenovo/Desktop/Hackathone/run_app.bat) or run:
-```bash
-python run.py
-```
-* Automatically tests if port `8000` is free. If occupied, safely switches to `8080`, `8008`, `8090`, etc.
-* Automatically launches your web browser as soon as the server is ready.
-
-### Method B: Custom Port Specification
-If you have other services running and wish to bind to a specific port:
-```bash
-# Windows Batch
-.\run_app.bat 8088
-
-# Python Runner
-python run.py --port 8088
-```
-
-### Access in Browser:
-👉 **[http://127.0.0.1:8000](http://127.0.0.1:8000)** (or the auto-assigned port).
-
----
-
-## 🌐 Cloud Deployment Guide (For the Hackathon Jury)
-
-You can easily deploy DataLens AI to the cloud so the judges can access a live public URL from their phones or laptops.
-
-### Option 1: Render (Free & Fast)
-1. Push this repository to GitHub.
-2. In [Render Dashboard](https://dashboard.render.com), click **New +** → **Web Service**.
-3. Connect your repository.
-4. Set the following configuration:
-   * **Runtime**: `Python 3`
-   * **Build Command**:
-     ```bash
-     pip install -r backend/requirements.txt && cd frontend && npm install && npm run build && cd ..
-     ```
-   * **Start Command**:
-     ```bash
-     cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
-     ```
-5. Click **Deploy Web Service**. Render will assign you a live HTTPS URL (e.g. `https://datalens-ai.onrender.com`).
-
----
-
-### Option 2: Railway.app
-1. In [Railway](https://railway.app), click **New Project** → **Deploy from GitHub repo**.
-2. Railway detects Python automatically. Set Start Command:
-   ```bash
-   python run.py --port $PORT --no-browser
-   ```
-3. Generate Domain under Service Settings.
-
----
-
-### Option 3: Instant Public Demo via ngrok / LocalTunnel (Zero Deploy Setup)
-If you want to demo live during the hackathon without configuring cloud servers:
-```bash
-# 1. Start your local platform
-python run.py --no-browser
-
-# 2. In another terminal, expose port 8000 via ngrok
-npx localtunnel --port 8000
-# or
-ngrok http 8000
-```
-This gives you an instant public HTTPS link (e.g. `https://datalens-ai.loca.lt`) to share with the jury!
-
----
 
 ## 🧪 Tech Stack & Engineering Rigor
 
@@ -164,13 +87,3 @@ This gives you an instant public HTTPS link (e.g. `https://datalens-ai.loca.lt`)
 | **Voice AI** | Native HTML5 Web Speech Synthesis API | Zero-latency executive verbal speech synthesis |
 | **LLM Reasoning** | Google Gemini / Groq / Ollama (Llama 3) / OpenAI | Fallback-resilient natural language explanation synthesis |
 
----
-
-## 👨‍💻 Project Presentation Checklist for Hackathon Jury
-- [x] **Zero Hallucination Proof**: Click **Inspect Code** to demonstrate real Pandas kernel execution.
-- [x] **Hypothesis Generation**: Show automated question cards populated immediately upon dataset upload.
-- [x] **Multi-Domain Versatility**: Switch between *Retail Sales*, *Clinical Health*, and *Student Academics* in 1 click.
-- [x] **Interactive Prescriptive AI**: Demonstrate the **What-If Simulator** with live slider shifts.
-- [x] **Auditory Experience**: Click **Voice Brief** to present the speech briefing.
-- [x] **Data Hygiene Action**: Download the sanitized CSV using the **Data Sanitizer**.
-- [x] **Tangible Takeaway**: Export the **Executive PDF Report**.
