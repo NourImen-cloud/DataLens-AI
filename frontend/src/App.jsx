@@ -244,9 +244,6 @@ export default function App() {
               <span className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
                 DataLens <span className="text-emerald-600 dark:text-emerald-400">AI</span>
               </span>
-              <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 rounded-full">
-                Come Build with AI Hackathon 2026
-              </span>
             </div>
           </div>
 
@@ -381,18 +378,6 @@ export default function App() {
             </>
           )}
         </main>
-
-        {/* Footer */}
-        <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 px-6 text-center text-xs text-slate-500">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span className="font-semibold text-slate-600 dark:text-slate-400">
-              DataLens AI · GOMYCODE Hackathon "Come Build with AI" (27 Sept 2026)
-            </span>
-            <span className="font-mono text-slate-500">
-              Python Kernel Execution · Zero Hallucination Ground Truth
-            </span>
-          </div>
-        </footer>
       </div>
 
       {/* Upload Modal (With explicit prominent (X) button, backdrop click close & Esc key) */}
