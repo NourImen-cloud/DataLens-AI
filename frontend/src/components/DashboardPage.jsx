@@ -292,42 +292,78 @@ export default function DashboardPage({
           </div>
         </div>
 
-        {/* Segment Share / Donut Card (4 cols, matching Image 2's circular donut with legend) */}
-        <div className="lg:col-span-4 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+        {/* Segment Share / Donut Card (4 cols, fully responsive) */}
+        <div className="lg:col-span-4 p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
                 Segment Breakdown
               </h3>
-              <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
                 {donutData[0]?.share || 42}% Leader
               </span>
             </div>
 
-            <div className="mt-2">
-              <p className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-3">
+              <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">
                 {donutData[0]?.name || 'Top Segment'}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Commands largest share of {primaryCatCol.replace('_', ' ')}
               </p>
             </div>
 
-            <div className="h-64 my-2">
+            {/* Responsive Donut Chart */}
+            <div className="h-48 sm:h-52 my-1">
               <ChartRenderer
                 data={donutData}
                 type="pie"
                 targetColumn="Distribution"
-                height={240}
+                height={200}
               />
+            </div>
+
+            {/* Responsive Segment Progress Breakdown List */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              {donutData.slice(0, 4).map((item, idx) => {
+                const colors = ['#059669', '#0891b2', '#4f46e5', '#d97706', '#db2777'];
+                const segColor = colors[idx % colors.length];
+                return (
+                  <div key={idx} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-2 min-w-0 pr-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: segColor }}
+                      />
+                      <span className="text-slate-700 dark:text-slate-300 font-medium truncate">
+                        {item.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <div className="w-12 sm:w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, item.share || 0)}%`,
+                            backgroundColor: segColor
+                          }}
+                        />
+                      </div>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white w-9 text-right">
+                        {item.share}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>Dimension: {primaryCatCol}</span>
+          <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span className="truncate pr-2">Dimension: {primaryCatCol}</span>
             <button
               onClick={() => onAskQuestion(`Which ${primaryCatCol} has the highest ${primaryNumCol}?`)}
-              className="text-emerald-700 dark:text-emerald-400 font-bold hover:underline"
+              className="text-emerald-700 dark:text-emerald-400 font-bold hover:underline shrink-0"
             >
               Analyze Segment →
             </button>

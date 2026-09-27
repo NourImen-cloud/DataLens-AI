@@ -70,24 +70,19 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
 
   if (type === 'pie') {
     return (
-      <div className="w-full h-80">
+      <div className="w-full relative" style={{ height: height || 220 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
+          <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }}
-              formatter={(val) => <span className="text-slate-700 dark:text-slate-300 font-medium">{val}</span>}
-            />
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={105}
-              innerRadius={58}
+              outerRadius="82%"
+              innerRadius="52%"
               paddingAngle={3}
-              label={({ name, percent }) => `${formatXLabel(name)} ${(percent * 100).toFixed(0)}%`}
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
