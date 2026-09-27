@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: datalens-ai
+    env: python
+    buildCommand: "pip install -r requirements.txt && npm --prefix frontend install && npm --prefix frontend run build"
+    startCommand: "python backend/main.py --host 0.0.0.0 --port $PORT --no-browser"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0

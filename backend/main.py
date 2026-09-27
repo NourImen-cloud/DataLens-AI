@@ -28,14 +28,69 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATASETS_DIR = os.path.join(os.path.dirname(__file__), "datasets")
-os.makedirs(DATASETS_DIR, exist_ok=True)
+BASE_DATASETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datasets")
+is_serverless = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+DATASETS_DIR = "/tmp/datasets" if is_serverless else BASE_DATASETS_DIR
+
+try:
+    os.makedirs(DATASETS_DIR, exist_ok=True)
+except Exception:
+    pass
+
+def find_dataset_file(filename_or_id: str) -> Optional[str]:
+    # Check exact in DATASETS_DIR
+    cand = os.path.join(DATASETS_DIR, filename_or_id)
+    if os.path.exists(cand):
+        return cand
+    # Check exact in BASE_DATASETS_DIR
+    cand2 = os.path.join(BASE_DATASETS_DIR, filename_or_id)
+    if os.path.exists(cand2):
+        return cand2
+    # Check with extensions or prefix matches
+    for d in [DATASETS_DIR, BASE_DATASETS_DIR]:
+        if os.path.exists(d):
+            try:
+                for f in os.listdir(d):
+                    if f == filename_or_id or f.startswith(f"{filename_or_id}.") or f.startswith(f"{filename_or_id}_"):
+                        return os.path.join(d, f)
+            except Exception:
+                pass
+    return None
+
+def ensure_dataset_loaded(dataset_id: str) -> bool:
+    if analysis_engine.get_profile(dataset_id):
+        return True
+    file_path = find_dataset_file(dataset_id)
+    if file_path:
+        try:
+            analysis_engine.load_dataset(dataset_id, file_path)
+            return True
+        except Exception:
+            pass
+    # Check known sample mappings
+    sample_map = {
+        "retail_sales_2026": "retail_sales_2026.csv",
+        "retail_sales": "retail_sales_2026.csv",
+        "clinical_patients": "clinical_patients.csv",
+        "student_performance": "student_performance.csv",
+        "saas_churn_metrics": "saas_churn_metrics.csv",
+        "saas_churn": "saas_churn_metrics.csv"
+    }
+    if dataset_id in sample_map:
+        f = find_dataset_file(sample_map[dataset_id])
+        if f:
+            try:
+                analysis_engine.load_dataset(dataset_id, f)
+                return True
+            except Exception:
+                pass
+    return False
 
 # Pre-load retail_sales_2026 on startup if exists
 @app.on_event("startup")
 def startup_event():
-    retail_sample = os.path.join(DATASETS_DIR, "retail_sales_2026.csv")
-    if os.path.exists(retail_sample):
+    retail_sample = find_dataset_file("retail_sales_2026.csv")
+    if retail_sample and os.path.exists(retail_sample):
         try:
             analysis_engine.load_dataset("retail_sales_2026", retail_sample)
             print("Loaded initial sample dataset: retail_sales_2026")
@@ -114,8 +169,8 @@ def load_sample_dataset(name: str):
         raise HTTPException(status_code=404, detail="Sample dataset not found.")
 
     file_name, dataset_id = allowed[name]
-    sample_path = os.path.join(DATASETS_DIR, file_name)
-    if not os.path.exists(sample_path):
+    sample_path = find_dataset_file(file_name)
+    if not sample_path or not os.path.exists(sample_path):
         raise HTTPException(status_code=404, detail="Sample file missing on disk.")
 
     profile = analysis_engine.load_dataset(dataset_id, sample_path)
@@ -130,6 +185,7 @@ def load_sample_dataset(name: str):
 
 @app.get("/api/dataset/{dataset_id}/profile")
 def get_dataset_profile(dataset_id: str):
+    ensure_dataset_loaded(dataset_id)
     profile = analysis_engine.get_profile(dataset_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -137,15 +193,18 @@ def get_dataset_profile(dataset_id: str):
 
 @app.get("/api/dataset/{dataset_id}/insights")
 def get_dataset_insights(dataset_id: str):
+    ensure_dataset_loaded(dataset_id)
     insights = analysis_engine.get_insights(dataset_id)
     return {"insights": insights}
 
 @app.get("/api/dataset/{dataset_id}/suggested-questions")
 def get_suggested_questions(dataset_id: str):
+    ensure_dataset_loaded(dataset_id)
     return analysis_engine.get_categorized_questions(dataset_id)
 
 @app.post("/api/query")
 def execute_query(req: QueryRequest):
+    ensure_dataset_loaded(req.dataset_id)
     profile = analysis_engine.get_profile(req.dataset_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Dataset not found.")
@@ -193,6 +252,7 @@ def execute_query(req: QueryRequest):
 
 @app.post("/api/executive-report")
 def generate_executive_report(req: ReportRequest):
+    ensure_dataset_loaded(req.dataset_id)
     try:
         report_data = analysis_engine.generate_executive_report_data(req.dataset_id)
         report = llm_service.generate_executive_report(report_data)
@@ -205,6 +265,7 @@ def generate_executive_report(req: ReportRequest):
 
 @app.get("/api/dataset/{dataset_id}/audio-briefing")
 def get_audio_briefing(dataset_id: str):
+    ensure_dataset_loaded(dataset_id)
     try:
         return analysis_engine.generate_audio_briefing(dataset_id)
     except Exception as e:
@@ -212,6 +273,7 @@ def get_audio_briefing(dataset_id: str):
 
 @app.post("/api/dataset/{dataset_id}/simulate")
 def simulate_scenario(dataset_id: str, req: SimulationRequest):
+    ensure_dataset_loaded(dataset_id)
     try:
         return analysis_engine.simulate_scenario(
             dataset_id=dataset_id,
@@ -224,6 +286,7 @@ def simulate_scenario(dataset_id: str, req: SimulationRequest):
 
 @app.get("/api/dataset/{dataset_id}/compare-options")
 def get_compare_options(dataset_id: str):
+    ensure_dataset_loaded(dataset_id)
     profile = analysis_engine.get_profile(dataset_id)
     df = analysis_engine.get_dataset(dataset_id)
     if not profile or df is None:
@@ -242,6 +305,7 @@ def get_compare_options(dataset_id: str):
 
 @app.post("/api/dataset/{dataset_id}/compare")
 def compare_cohorts(dataset_id: str, req: ComparisonRequest):
+    ensure_dataset_loaded(dataset_id)
     try:
         return analysis_engine.compare_cohorts(
             dataset_id=dataset_id,
@@ -254,6 +318,7 @@ def compare_cohorts(dataset_id: str, req: ComparisonRequest):
 
 @app.get("/api/dataset/{dataset_id}/clean-export")
 def clean_and_export(dataset_id: str, clip_outliers: bool = True, fill_missing: bool = True):
+    ensure_dataset_loaded(dataset_id)
     try:
         res = analysis_engine.clean_and_export_dataset(dataset_id, clip_outliers, fill_missing)
         from fastapi.responses import Response
