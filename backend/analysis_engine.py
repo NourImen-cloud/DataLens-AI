@@ -154,11 +154,20 @@ class AnalysisEngine:
         cat_cols = profile["categorical_cols"]
         date_cols = profile["datetime_cols"]
 
+        # Helper to check if a column represents currency
+        def is_curr(name: str) -> bool:
+            return any(k in name.lower() for k in ["rev", "sales", "price", "profit", "mrr", "cost", "salary", "spend", "discount", "payment"])
+
+        def fmt_val(name: str, val: float) -> str:
+            if is_curr(name):
+                return f"${val:,.2f}"
+            return f"{val:,.2f}"
+
         # 1. TRENDS (if date column exists)
         if date_cols and num_cols:
             date_col = date_cols[0]
-            # Primary monetary or volume metric
-            primary_num = next((c for c in num_cols if any(k in c.lower() for k in ["rev", "sales", "profit", "amount", "total", "mrr"])), num_cols[0])
+            # Primary metric
+            primary_num = next((c for c in num_cols if is_curr(c)), num_cols[0])
             
             try:
                 # Group by month
@@ -181,8 +190,8 @@ class AnalysisEngine:
                         "id": "insight-trend-1",
                         "type": "trend",
                         "badge": "Growth Trend",
-                        "title": f"{primary_num.replace('_', ' ').title()} {trend_direction} {abs(total_change_pct)}% across analyzed timeframe",
-                        "description": f"Overall {primary_num.replace('_', ' ')} moved from ${first_val:,.0f} in {monthly.index[0]} to ${last_val:,.0f} in {monthly.index[-1]}.",
+                        "title": f"{primary_num.replace('_', ' ').title()} {trend_direction} {abs(total_change_pct)}% across timeline",
+                        "description": f"Overall {primary_num.replace('_', ' ')} moved from {fmt_val(primary_num, first_val)} in {monthly.index[0]} to {fmt_val(primary_num, last_val)} in {monthly.index[-1]}.",
                         "metric": f"{'+' if total_change_pct >= 0 else ''}{total_change_pct}%",
                         "severity": "positive" if total_change_pct >= 0 else "warning",
                         "target_col": primary_num,
@@ -196,7 +205,7 @@ class AnalysisEngine:
                             "type": "anomaly",
                             "badge": "Anomaly Detected",
                             "title": f"{worst_month} showed an unusual decline of {abs(round(worst_drop, 1))}%",
-                            "description": f"Performance contracted sharply in {worst_month} compared to the preceding period. Requires regional and product breakdown.",
+                            "description": f"Performance contracted sharply in {worst_month} compared to preceding period. Suggesting segment breakdown.",
                             "metric": f"{round(worst_drop, 1)}%",
                             "severity": "danger",
                             "target_col": primary_num,
@@ -206,8 +215,8 @@ class AnalysisEngine:
             except Exception:
                 pass
 
-        # 2. OUTLIERS (Extreme transactions)
-        outlier_col = next((c for c in num_cols if any(k in c.lower() for k in ["rev", "sales", "profit", "amount", "total", "charge"])), num_cols[0] if num_cols else None)
+        # 2. OUTLIERS (Extreme values across any numerical column)
+        outlier_col = next((c for c in num_cols if is_curr(c)), num_cols[0] if num_cols else None)
         if outlier_col:
             series = df[outlier_col].dropna()
             if len(series) > 10:
@@ -224,15 +233,15 @@ class AnalysisEngine:
                         "id": "insight-outlier-1",
                         "type": "outlier",
                         "badge": "High Outliers",
-                        "title": f"{count_outliers} transactions are unusually large compared with the dataset",
-                        "description": f"Extreme transactions peak at ${max_outlier:,.2f} versus the dataset median of ${med_val:,.2f} (3x IQR threshold).",
+                        "title": f"{count_outliers} records have unusually high {outlier_col.replace('_', ' ')}",
+                        "description": f"Extreme records peak at {fmt_val(outlier_col, max_outlier)} versus the dataset median of {fmt_val(outlier_col, med_val)} (3x IQR threshold).",
                         "metric": f"{count_outliers} rows",
                         "severity": "warning",
                         "target_col": outlier_col,
                         "suggested_query": f"Are there unusual values in {outlier_col}?"
                     })
 
-        # 3. CORRELATIONS
+        # 3. CORRELATIONS (Universal for any domain)
         if len(num_cols) >= 2:
             corr_df = df[num_cols].corr()
             strong_pairs = []
@@ -240,7 +249,7 @@ class AnalysisEngine:
                 for j in range(i + 1, len(num_cols)):
                     c1, c2 = num_cols[i], num_cols[j]
                     val = corr_df.loc[c1, c2]
-                    if pd.notna(val) and abs(val) >= 0.50:
+                    if pd.notna(val) and abs(val) >= 0.45:
                         strong_pairs.append((c1, c2, float(val)))
             
             strong_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
@@ -260,10 +269,10 @@ class AnalysisEngine:
                 })
 
         # 4. CATEGORY DIFFERENCES & LEADER SHARES
-        rev_col = next((c for c in num_cols if any(k in c.lower() for k in ["rev", "sales", "mrr", "amount"])), num_cols[0] if num_cols else None)
-        if rev_col and cat_cols:
+        top_num_col = next((c for c in num_cols if is_curr(c)), num_cols[0] if num_cols else None)
+        if top_num_col and cat_cols:
             for cat_col in cat_cols[:2]:
-                grouped = df.groupby(cat_col)[rev_col].sum().sort_values(ascending=False)
+                grouped = df.groupby(cat_col)[top_num_col].sum().sort_values(ascending=False)
                 if len(grouped) >= 2:
                     top_name = str(grouped.index[0])
                     top_val = float(grouped.iloc[0])
@@ -274,13 +283,13 @@ class AnalysisEngine:
                         "id": f"insight-cat-{cat_col}",
                         "type": "category_leader",
                         "badge": "Dominant Segment",
-                        "title": f"{top_name} leads {cat_col.replace('_', ' ')}, accounting for {share_pct}% of total {rev_col.replace('_', ' ')}",
-                        "description": f"Segment '{top_name}' generated ${top_val:,.0f} out of ${total_val:,.0f} across all {cat_col}s.",
+                        "title": f"{top_name} leads {cat_col.replace('_', ' ')}, accounting for {share_pct}% of total {top_num_col.replace('_', ' ')}",
+                        "description": f"Segment '{top_name}' reached {fmt_val(top_num_col, top_val)} out of {fmt_val(top_num_col, total_val)} across all {cat_col} categories.",
                         "metric": f"{share_pct}% share",
                         "severity": "info",
-                        "target_col": rev_col,
+                        "target_col": top_num_col,
                         "group_by": cat_col,
-                        "suggested_query": f"Which {cat_col} generated the most {rev_col}?"
+                        "suggested_query": f"Which {cat_col} generated the most {top_num_col}?"
                     })
                     break
 
@@ -293,7 +302,7 @@ class AnalysisEngine:
                 "type": "missing_data",
                 "badge": "Data Quality Notice",
                 "title": f"{top_missing['name'].replace('_', ' ').title()} contains {top_missing['missing_pct']}% missing values",
-                "description": f"{top_missing['missing_count']} records lack entries for {top_missing['name']}. Data imputation or validation recommended.",
+                "description": f"{top_missing['missing_count']} records lack entries for {top_missing['name']}. Data validation recommended.",
                 "metric": f"{top_missing['missing_pct']}% missing",
                 "severity": "warning",
                 "suggested_query": f"Show missing values distribution across columns"
@@ -477,6 +486,338 @@ class AnalysisEngine:
             "profit_margin": round((total_profit / total_rev) * 100, 1) if total_rev > 0 and total_profit > 0 else None,
             "breakdowns": breakdowns,
             "insights": insights
+        }
+
+    def get_categorized_questions(self, dataset_id: str) -> Dict[str, Any]:
+        """Dynamically inspects any dataset schema, domain, distributions, outliers,
+        and correlations to automatically generate rich, categorized investigative questions."""
+        profile = self.get_profile(dataset_id)
+        if not profile:
+            return {
+                "domain": {
+                    "name": "General Tabular Dataset",
+                    "badge": "Tabular",
+                    "icon": "database",
+                    "primary_metric": "value",
+                    "primary_dimension": "category",
+                    "summary": "Multi-dimensional dataset loaded into DataLens AI."
+                },
+                "categories": [
+                    {"id": "all", "label": "All Inquiries", "count": 3},
+                    {"id": "performance", "label": "Performance", "count": 1},
+                    {"id": "trends", "label": "Trends", "count": 1},
+                    {"id": "anomalies", "label": "Anomalies", "count": 1}
+                ],
+                "questions": [
+                    {
+                        "id": "q1",
+                        "category": "performance",
+                        "pillar": "Performance",
+                        "badge": "Top Breakdown",
+                        "question": "Which categories perform best across primary metrics?",
+                        "hypothesis": "Ranks top categories by aggregate contribution."
+                    },
+                    {
+                        "id": "q2",
+                        "category": "trends",
+                        "pillar": "Trends",
+                        "badge": "Timeline",
+                        "question": "What are the main patterns and trajectory over time?",
+                        "hypothesis": "Evaluates period-over-period movement."
+                    },
+                    {
+                        "id": "q3",
+                        "category": "anomalies",
+                        "pillar": "Anomalies",
+                        "badge": "Outliers",
+                        "question": "Are there unusual values or statistical outliers?",
+                        "hypothesis": "Scans for 3x IQR deviations."
+                    }
+                ],
+                "flat_questions": [
+                    "Which categories perform best across primary metrics?",
+                    "What are the main patterns and trajectory over time?",
+                    "Are there unusual values or statistical outliers?"
+                ]
+            }
+
+        num_cols = profile.get("numerical_cols", [])
+        cat_cols = profile.get("categorical_cols", [])
+        date_cols = profile.get("datetime_cols", [])
+        col_names_lower = [c.lower() for c in (num_cols + cat_cols + date_cols)]
+        all_cols_text = " ".join(col_names_lower)
+
+        # 1. DOMAIN IDENTIFICATION
+        domain_name = "Enterprise Operations"
+        domain_badge = "Operational Data"
+        domain_icon = "layers"
+        if any(k in all_cols_text for k in ["patient", "blood_pressure", "cholesterol", "diagnosis", "glucose", "bmi", "hospital", "doctor", "smoker", "treatment", "disease", "clinical"]):
+            domain_name = "Healthcare & Clinical Diagnostics"
+            domain_badge = "Clinical Health"
+            domain_icon = "activity"
+        elif any(k in all_cols_text for k in ["churn", "mrr", "subscription", "arr", "plan_tier", "retention", "cac", "ltv", "seats"]):
+            domain_name = "SaaS Retention & Product Analytics"
+            domain_badge = "Product / SaaS"
+            domain_icon = "bar-chart-2"
+        elif any(k in all_cols_text for k in ["student", "grade", "score", "attendance", "exam", "gpa", "course", "study_hours", "education", "faculty"]):
+            domain_name = "Academic & Student Performance"
+            domain_badge = "Education"
+            domain_icon = "graduation-cap"
+        elif any(k in all_cols_text for k in ["sale", "revenue", "order", "price", "profit", "product", "discount", "retail", "store"]):
+            domain_name = "Retail & Commercial Commerce"
+            domain_badge = "Commercial"
+            domain_icon = "shopping-bag"
+        elif any(k in all_cols_text for k in ["employee", "salary", "department", "attrition", "hire", "tenure", "hr", "payroll"]):
+            domain_name = "Human Resources & Workforce Intelligence"
+            domain_badge = "Workforce HR"
+            domain_icon = "users"
+        elif any(k in all_cols_text for k in ["temp", "humidity", "sensor", "energy", "power", "vibration", "voltage", "device", "iot", "weather"]):
+            domain_name = "IoT, Environmental & Sensory Telemetry"
+            domain_badge = "Sensory IoT"
+            domain_icon = "cpu"
+
+        # 2. COLUMN ROLES: Prioritize high-level aggregates like total_amount, sales, mrr, revenue, score, etc.
+        metric_priority = ["total_amount", "revenue", "sales", "mrr", "arr", "amount", "monthly_revenue", "score", "midterm_score", "final_score", "systolic_bp", "gpa", "total", "profit", "price", "unit_price", "rate", "value"]
+        primary_num = None
+        for mp in metric_priority:
+            matched = next((c for c in num_cols if mp == c.lower() or mp in c.lower()), None)
+            if matched:
+                primary_num = matched
+                break
+        if not primary_num:
+            primary_num = num_cols[0] if num_cols else None
+
+        second_num = next((c for c in num_cols if c != primary_num and any(k in c.lower() for k in ["profit", "cost", "margin", "discount", "hours", "bmi", "age", "rate", "fee", "days", "price"])), (num_cols[1] if len(num_cols) > 1 else None))
+
+        # Best categorical column: preferably one with 2-50 distinct values, skipping ID columns
+        primary_cat = None
+        for cp in profile.get("column_profiles", []):
+            name_lower = cp["name"].lower()
+            if any(id_kw in name_lower for id_kw in ["_id", "id", "uuid", "guid", "code", "index", "key"]):
+                continue
+            if cp.get("type") == "categorical" and 2 <= cp.get("unique_count", 0) <= 50:
+                primary_cat = cp["name"]
+                break
+        if not primary_cat:
+            for c in cat_cols:
+                if not any(id_kw in c.lower() for id_kw in ["_id", "id", "uuid", "guid", "code", "index", "key"]):
+                    primary_cat = c
+                    break
+        if not primary_cat:
+            primary_cat = cat_cols[0] if cat_cols else None
+
+        second_cat = None
+        for c in cat_cols:
+            if c != primary_cat and not any(id_kw in c.lower() for id_kw in ["_id", "id", "uuid", "guid", "code", "index", "key"]):
+                second_cat = c
+                break
+        if not second_cat and len(cat_cols) > 1:
+            second_cat = next((c for c in cat_cols if c != primary_cat), None)
+        date_col = date_cols[0] if date_cols else None
+
+        # 3. STATISTICAL OUTLIER DETECTION
+        outlier_col = None
+        max_outliers = 0
+        for cp in profile.get("column_profiles", []):
+            if cp.get("type") == "numerical":
+                stats = cp.get("stats", {})
+                if stats.get("outliers_count", 0) > max_outliers:
+                    max_outliers = stats["outliers_count"]
+                    outlier_col = cp["name"]
+
+        # 4. STRONG CORRELATION DETECTION
+        strongest_corr_pair = None
+        highest_abs_corr = 0.0
+        corr_matrix = profile.get("correlations", [])
+        for row in corr_matrix:
+            c1 = row.get("column")
+            for c2, val in row.items():
+                if c2 != "column" and c1 != c2:
+                    try:
+                        abs_v = abs(float(val))
+                        if abs_v > highest_abs_corr and abs_v < 0.999: # exclude self
+                            highest_abs_corr = abs_v
+                            strongest_corr_pair = (c1, c2, float(val))
+                    except:
+                        pass
+
+        # 5. GENERATE CATEGORIZED QUESTIONS
+        questions = []
+
+        # --- PILLAR 1: Performance & Volume Breakdowns ---
+        if primary_cat and primary_num:
+            questions.append({
+                "id": "q_perf_1",
+                "category": "performance",
+                "pillar": "Performance",
+                "badge": "Top Driver",
+                "question": f"Which {primary_cat} drives the highest {primary_num}?",
+                "hypothesis": f"Identifies dominant {primary_cat} segments contributing the highest cumulative volume."
+            })
+        if second_cat and primary_num:
+            questions.append({
+                "id": "q_perf_2",
+                "category": "performance",
+                "pillar": "Performance",
+                "badge": "Segmentation",
+                "question": f"How is {primary_num} distributed across {second_cat}?",
+                "hypothesis": f"Evaluates performance variation and reveals under-served or over-performing segments."
+            })
+        if primary_cat and second_num:
+            questions.append({
+                "id": "q_perf_3",
+                "category": "performance",
+                "pillar": "Performance",
+                "badge": "Efficiency",
+                "question": f"What is the average {second_num} grouped by {primary_cat}?",
+                "hypothesis": f"Compares unit efficiency, rates, or averages across {primary_cat} cohorts."
+            })
+
+        # --- PILLAR 2: Trends & Timeline Evolution ---
+        if date_col and primary_num:
+            questions.append({
+                "id": "q_trend_1",
+                "category": "trends",
+                "pillar": "Trends",
+                "badge": "Temporal Trend",
+                "question": f"How has {primary_num} evolved over time?",
+                "hypothesis": f"Analyzes velocity, seasonal fluctuations, and historical growth trajectory across {date_col}."
+            })
+            if primary_cat:
+                questions.append({
+                    "id": "q_trend_2",
+                    "category": "trends",
+                    "pillar": "Trends",
+                    "badge": "Cohort Evolution",
+                    "question": f"How did monthly {primary_num} vary across {primary_cat}?",
+                    "hypothesis": f"Discovers which {primary_cat} segments accelerated or contracted over time."
+                })
+        else:
+            if primary_num:
+                questions.append({
+                    "id": "q_trend_1",
+                    "category": "trends",
+                    "pillar": "Trends",
+                    "badge": "Ranking",
+                    "question": f"What are the top 10 highest records by {primary_num}?",
+                    "hypothesis": f"Isolates the highest individual data points in {primary_num}."
+                })
+
+        # --- PILLAR 3: Anomalies & Risk Diagnostics ---
+        if outlier_col and max_outliers > 0:
+            questions.append({
+                "id": "q_anom_1",
+                "category": "anomalies",
+                "pillar": "Anomalies",
+                "badge": f"{max_outliers} Outliers Detected",
+                "question": f"Are there extreme outliers or anomalous values in {outlier_col}?",
+                "hypothesis": f"Scans for records beyond 3x IQR that warrant risk review or exceptional audit."
+            })
+        elif primary_num:
+            questions.append({
+                "id": "q_anom_1",
+                "category": "anomalies",
+                "pillar": "Anomalies",
+                "badge": "Risk Audit",
+                "question": f"Are there unusual statistical outliers in {primary_num}?",
+                "hypothesis": f"Examines upper/lower threshold boundaries and extreme variance."
+            })
+        if primary_cat and primary_num:
+            questions.append({
+                "id": "q_anom_2",
+                "category": "anomalies",
+                "pillar": "Anomalies",
+                "badge": "Underperformance",
+                "question": f"Which {primary_cat} represents the lowest {primary_num} or highest variance?",
+                "hypothesis": f"Pinpoints laggards or erratic segments requiring operational attention."
+            })
+
+        # --- PILLAR 4: Drivers & Correlations ---
+        if strongest_corr_pair:
+            c1, c2, val = strongest_corr_pair
+            direction = "positive" if val > 0 else "inverse"
+            questions.append({
+                "id": "q_corr_1",
+                "category": "correlations",
+                "pillar": "Correlations",
+                "badge": f"r = {val}",
+                "question": f"What is the correlation between {c1} and {c2}?",
+                "hypothesis": f"Strong {direction} statistical relationship ({val}) indicates potential predictive dependency."
+            })
+        elif primary_num and second_num:
+            questions.append({
+                "id": "q_corr_1",
+                "category": "correlations",
+                "pillar": "Correlations",
+                "badge": "Driver Analysis",
+                "question": f"What is the relationship between {primary_num} and {second_num}?",
+                "hypothesis": f"Examines whether fluctuations in {primary_num} mirror changes in {second_num}."
+            })
+
+        # --- PILLAR 5: Distribution & Spread ---
+        if primary_num:
+            questions.append({
+                "id": "q_dist_1",
+                "category": "distribution",
+                "pillar": "Distribution",
+                "badge": "Histogram",
+                "question": f"What is the statistical distribution and spread of {primary_num}?",
+                "hypothesis": f"Visualizes frequency bins, skewness, median vs mean, and concentration."
+            })
+        if primary_cat:
+            questions.append({
+                "id": "q_dist_2",
+                "category": "distribution",
+                "pillar": "Distribution",
+                "badge": "Composition",
+                "question": f"What is the volume composition across all {primary_cat} categories?",
+                "hypothesis": f"Reveals share of total records and identifies if 80/20 Pareto principle applies."
+            })
+
+        # Fallback if few questions generated
+        if len(questions) < 3:
+            questions.append({
+                "id": "q_exec",
+                "category": "performance",
+                "pillar": "Performance",
+                "badge": "Executive",
+                "question": "Generate a comprehensive executive breakdown of all primary columns.",
+                "hypothesis": "Summarizes aggregate totals, averages, and key observations."
+            })
+
+        # Categories list with counts
+        cat_counts = {}
+        for q in questions:
+            c = q["category"]
+            cat_counts[c] = cat_counts.get(c, 0) + 1
+
+        categories = [
+            {"id": "all", "label": "All Inquiries", "count": len(questions)},
+            {"id": "performance", "label": "Performance & Breakdowns", "count": cat_counts.get("performance", 0)},
+            {"id": "trends", "label": "Trends & Timeline", "count": cat_counts.get("trends", 0)},
+            {"id": "anomalies", "label": "Anomalies & Outliers", "count": cat_counts.get("anomalies", 0)},
+            {"id": "correlations", "label": "Drivers & Correlations", "count": cat_counts.get("correlations", 0)},
+            {"id": "distribution", "label": "Distribution & Spread", "count": cat_counts.get("distribution", 0)}
+        ]
+        categories = [c for c in categories if c["id"] == "all" or c["count"] > 0]
+
+        return {
+            "domain": {
+                "name": domain_name,
+                "badge": domain_badge,
+                "icon": domain_icon,
+                "primary_metric": primary_num,
+                "primary_dimension": primary_cat,
+                "secondary_metric": second_num,
+                "secondary_dimension": second_cat,
+                "date_column": date_col,
+                "rows": profile.get("rows", 0),
+                "columns": profile.get("columns", 0),
+                "summary": f"{profile.get('rows', 0):,} rows across {profile.get('columns', 0)} dimensions. Primary metric: {primary_num or 'N/A'}, Dimension: {primary_cat or 'N/A'}."
+            },
+            "categories": categories,
+            "questions": questions,
+            "flat_questions": [q["question"] for q in questions]
         }
 
 # Global singleton

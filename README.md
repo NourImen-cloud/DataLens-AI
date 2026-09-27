@@ -1,118 +1,64 @@
 # DataLens AI 🔍⚡
-> **"Turn any dataset into decisions through conversation."**  
-> *"Upload your data. Ask anything. Understand everything."*
+> **GOMYCODE Hackathon: “Come Build with AI” (27 September 2026)**  
+> *“Upload your data. Ask anything. Understand everything.”*
 
 ---
 
-## 🚀 Overview
+## 🏆 Project Architecture for Hackathon Jury
 
-**DataLens AI** is an autonomous AI Data Analyst engineered for non-technical decision-makers. It enables users to upload raw tabular datasets (CSV / Excel), ask questions in natural language, automatically generate verified visualizations, and receive board-ready executive explanations.
+DataLens AI transforms any dataset into strategic decisions through natural language conversation without hallucinated numbers. 
 
-### 🛡️ Non-Hallucination Architecture (Ground Truth Principle)
-Unlike conventional "chat with CSV" tools that inject entire files into an LLM prompt and hallucinate figures, **DataLens AI strictly decouples reasoning from computation**:
-1. **Natural Language Understanding**: Translates the query into a structured `Analysis Plan`.
-2. **Deterministic Python/Pandas Execution**: Computes the exact numbers, aggregates, distributions, and outliers directly on the data.
-3. **LLM Decision Communication**: The LLM interprets the verified mathematical results to explain *what happened*, *why it might be happening*, and *what to investigate next*.
+### 📐 3-Page Dedicated Experience (As Designed)
 
-```
-   USER QUESTION
-        │
-        ▼
-   QUESTION UNDERSTANDING
-        │
-        ▼
-   ANALYSIS PLAN (JSON)
-        │
-        ▼
-   PYTHON / PANDAS ENGINE  ──► [ Ground Truth: Exact Calculations ]
-        │
-        ▼
-   INTERACTIVE RECHARTS VISUALIZATION (Bar, Line, Area, Pie)
-        │
-        ▼
-   DECISION-GRADE AI EXPLANATION + STRATEGIC FOLLOW-UPS
-```
+#### 1. 🤖 Page 1: AI Assistant (Conversational Decision Engine)
+- Inspired by modern, minimalist prompt centers (glowing 3D ambient sphere, *"Hello, Jackson — How can I assist you today?"*).
+- **Core Value Brief**: Tells the user what the AI does before prompting.
+- **Sleek Input Hub**:
+  - Direct `Attach CSV / Excel` button and drag-and-drop file ingestion.
+  - Active dataset pill with record count.
+  - One-click multi-domain benchmark loaders (`Retail Sales`, `Healthcare Clinical Patients`, `Student Academic Performance`, `SaaS Retention`).
+- **Execution Pipeline Transparency**:
+  - Displays generated **Analysis Plan (JSON)**
+  - Shows executed **Python/Pandas Code**
+  - Interactive Recharts visualization (Bar, Line, Area, Donut switcher)
+  - Verified quantitative explanation with *"Why might this be happening?"* reasoning and follow-up inquiries.
 
----
+#### 2. 📊 Page 2: Executive Dashboard (Pattern Synthesis & Explorer)
+- Modeled after elite enterprise SaaS dashboards (Revenlo-inspired).
+- **4 Key Metric Cards**: Primary average/total, volume, 3x IQR anomaly flags, and data cleanliness rate.
+- **Performance Overview**: Smooth curved area/line chart with hover tooltips and dynamic timeline trends.
+- **Segment Breakdown**: Multi-color donut ring with centered leader percentage and interactive legend.
+- **Records Explorer**: Tabular inspector with search, pagination, and status pills (`Verified`, `High Outlier`).
 
-## ✨ Flagship Capabilities
-
-### 1. 📊 Instant Dataset Profiling
-Upon uploading any `.csv` or `.xlsx` file, DataLens AI automatically extracts:
-- **Key Metrics**: Rows, Columns, Missing Data %, Numerical vs Categorical counts
-- **Full Statistical Summary**: Mean, Std Dev, Min, 25%, Median, 75%, Max, and IQR Outlier detection
-- **Dynamic Distributions**: Binned histograms and category frequency distributions
-- **Correlation Matrix**: Interactive Pearson correlation heatmap
-
-### 2. ⚡ Autonomous Insight Engine
-Proactively discovers patterns before the user even types a prompt:
-- **Growth Trends**: e.g., *"Revenue increased 18.4% over analyzed timeframe"*
-- **Structural Anomalies**: e.g., *"March showed an unusual decline of 32.4%"*
-- **Severe Outliers**: 3x IQR anomaly scanner identifying extreme transactions
-- **Correlation Drivers**: Key statistical relationships (e.g. Advertising Spend vs. Revenue)
-- **Segment Leadership**: Dominant categories (e.g. Region North commanding 34.5% market share)
-
-### 3. 💬 Natural Language Analysis with Execution Transparency
-- Dynamic suggested questions tailored specifically to the dataset schema
-- Expandable step-by-step pipeline displaying:
-  - Generated **Analysis Plan (JSON)**
-  - Executed **Pandas Code Snippet**
-  - Interactive multi-mode chart (toggle between Bar, Line, Area, and Donut charts)
-  - Clear, verified narrative citing exact percentages
-  - Contextual *"Why might this be happening?"* hypothesis
-  - Clickable follow-up inquiries
-
-### 4. 📑 1-Click Executive Decision Report
-One-click generation of a comprehensive, C-level executive briefing featuring:
-- Executive Performance Summary
-- Key Quantitative Findings (with impact ratings)
-- Operational Risks & Urgent Anomalies
-- Strategic Recommendations with ROI projections & owners
-- Print / Export to PDF capability
+#### 3. ⚡ Page 3: Autonomous Statistical Insights
+- Proactively discovers hidden patterns without user prompts:
+  - **Growth Trends**: Positive trajectory or seasonal drops.
+  - **Structural Anomalies**: Specific period compressions (e.g. March dip).
+  - **Severe Outliers**: 3x IQR extreme transaction filtering.
+  - **Correlation Matrix**: Key statistical drivers (Pearson |r| >= 0.45).
+  - **Dominant Segments**: Market and category leadership shares.
+  - **Data Completeness**: Missing values notification.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛡️ Universal Data Support (Not Just Economic)
 
-- **Frontend**: React 18, Vite, Tailwind CSS, Lucide React, Recharts, Canvas Confetti
-- **Backend**: FastAPI, Uvicorn, Pydantic, Python 3.12
-- **Data Engine**: Pandas, NumPy, Scipy, Statsmodels
-- **AI / LLM Integration**: Multi-provider architecture supporting:
-  - Google Gemini (`gemini-1.5-flash`)
-  - Groq (`llama-3.3-70b-versatile`)
-  - Local Ollama (`llama3`, `mistral`, `qwen2.5`)
-  - OpenAI / OpenRouter
-  - **Deterministic Statistical Fallback**: Guaranteed 100% operation even offline or without API keys!
+DataLens AI is **domain-agnostic** and operates across all fields:
+1. **Retail & Commerce**: `retail_sales_2026.csv` (12,450 rows · revenue, profit, ad spend, March dip).
+2. **Healthcare & Medicine**: `clinical_patients.csv` (3,500 rows · blood pressure, cholesterol, BMI, risk score, recovery days).
+3. **Education & Academia**: `student_performance.csv` (4,200 rows · study hours, attendance rate, midterm, final score, pass status).
+4. **Technology & SaaS**: `saas_churn_metrics.csv` (5,200 rows · MRR, tenure, tickets, churn status).
+5. **Custom Uploads**: Drop any raw `.csv`, `.xlsx`, or `.xls` file.
 
 ---
 
-## 🏁 Quickstart Guide
+## 🚀 Running the Platform
 
-### 1. Launch the Application
-Run the launcher batch file or start the server via terminal:
-```bash
-# Terminal (Python FastAPI serves both API and built Frontend):
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
-```
-Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser.
+1. **Access Live**:
+   👉 **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
-### 2. Development Mode (Optional)
-To run frontend and backend with hot module reload:
-```bash
-# Terminal 1 - Backend:
-cd backend
-python -m uvicorn main:app --reload --port 8000
-
-# Terminal 2 - Frontend:
-cd frontend
-npm run dev
-# Accessible at http://localhost:5173 (proxies to backend at 8000)
-```
-
----
-
-## 🧪 Demo Datasets Included
-- **Retail Sales 2026** (12,450 rows, 14 columns):
-  - Preloaded out of the box with realistic seasonal trends, March dip anomaly, high-value B2B outliers, and demographic missing values.
-- **SaaS Churn & MRR** (5,200 rows, 9 columns):
-  - Recurring revenue, support ticket correlations, and contract retention dynamics.
+2. **One-Click Launch**:
+   Double click `run_app.bat` or run:
+   ```bash
+   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+   ```

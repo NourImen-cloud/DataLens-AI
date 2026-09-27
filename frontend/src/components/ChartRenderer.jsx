@@ -18,20 +18,20 @@ import {
 } from 'recharts';
 
 const COLORS = [
-  '#10b981', // emerald
-  '#06b6d4', // cyan
-  '#6366f1', // indigo
-  '#f59e0b', // amber
-  '#ec4899', // pink
-  '#8b5cf6', // purple
-  '#14b8a6', // teal
-  '#3b82f6', // blue
+  '#059669', // emerald-600
+  '#0891b2', // cyan-600
+  '#4f46e5', // indigo-600
+  '#d97706', // amber-600
+  '#db2777', // pink-600
+  '#7c3aed', // purple-600
+  '#0d9488', // teal-600
+  '#2563eb', // blue-600
 ];
 
 export default function ChartRenderer({ data, type = 'bar', targetColumn = 'value', height = 320 }) {
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-48 text-slate-400 dark:text-slate-500 text-sm">
         No chart data available to render.
       </div>
     );
@@ -45,15 +45,21 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
     return val;
   };
 
+  const formatXLabel = (val) => {
+    if (!val) return '';
+    const str = String(val);
+    return str.length > 14 ? `${str.slice(0, 13)}…` : str;
+  };
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const p = payload[0];
       const val = typeof p.value === 'number' ? p.value.toLocaleString() : p.value;
       const share = p.payload?.share ? ` (${p.payload.share}%)` : '';
       return (
-        <div className="bg-slate-900 border border-slate-700/80 px-3 py-2 rounded-lg shadow-xl text-xs">
-          <p className="font-semibold text-slate-200 mb-1">{label || p.payload?.name}</p>
-          <p className="text-emerald-400 font-mono">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 px-3.5 py-2.5 rounded-xl shadow-xl text-xs">
+          <p className="font-bold text-slate-900 dark:text-slate-100 mb-1">{label || p.payload?.name}</p>
+          <p className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
             {targetColumn.replace('_', ' ')}: {val}{share}
           </p>
         </div>
@@ -69,8 +75,8 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
           <PieChart>
             <Tooltip content={<CustomTooltip />} />
             <Legend
-              wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-              formatter={(val) => <span className="text-slate-300">{val}</span>}
+              wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }}
+              formatter={(val) => <span className="text-slate-700 dark:text-slate-300 font-medium">{val}</span>}
             />
             <Pie
               data={data}
@@ -78,10 +84,10 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={100}
-              innerRadius={55}
+              outerRadius={105}
+              innerRadius={58}
               paddingAngle={3}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={({ name, percent }) => `${formatXLabel(name)} ${(percent * 100).toFixed(0)}%`}
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -97,26 +103,28 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
     return (
       <div className="w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 25 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+          <LineChart data={data} margin={{ top: 15, right: 25, left: 15, bottom: 50 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.5} />
             <XAxis
               dataKey="name"
-              stroke="#94a3b8"
+              stroke="#64748b"
               fontSize={11}
               tickLine={false}
-              angle={-20}
+              tickFormatter={formatXLabel}
+              angle={-25}
               textAnchor="end"
-              height={40}
+              interval={0}
+              height={50}
             />
-            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
+            <YAxis stroke="#64748b" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
             <Tooltip content={<CustomTooltip />} />
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#10b981"
-              strokeWidth={2.5}
-              dot={{ r: 4, fill: '#10b981', stroke: '#0f172a', strokeWidth: 2 }}
-              activeDot={{ r: 6, fill: '#34d399' }}
+              stroke="#059669"
+              strokeWidth={3}
+              dot={{ r: 4, fill: '#059669', stroke: '#ffffff', strokeWidth: 2 }}
+              activeDot={{ r: 7, fill: '#10b981' }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -128,30 +136,32 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
     return (
       <div className="w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 25 }}>
+          <AreaChart data={data} margin={{ top: 15, right: 25, left: 15, bottom: 50 }}>
             <defs>
               <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#059669" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#059669" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.5} />
             <XAxis
               dataKey="name"
-              stroke="#94a3b8"
+              stroke="#64748b"
               fontSize={11}
               tickLine={false}
-              angle={-20}
+              tickFormatter={formatXLabel}
+              angle={-25}
               textAnchor="end"
-              height={40}
+              interval={0}
+              height={50}
             />
-            <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
+            <YAxis stroke="#64748b" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
             <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="value"
-              stroke="#10b981"
-              strokeWidth={2}
+              stroke="#059669"
+              strokeWidth={2.5}
               fillOpacity={1}
               fill="url(#colorValue)"
             />
@@ -165,20 +175,22 @@ export default function ChartRenderer({ data, type = 'bar', targetColumn = 'valu
   return (
     <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 20, left: 10, bottom: 25 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} vertical={false} />
+        <BarChart data={data} margin={{ top: 15, right: 25, left: 15, bottom: 50 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" opacity={0.4} vertical={false} />
           <XAxis
             dataKey="name"
-            stroke="#94a3b8"
+            stroke="#64748b"
             fontSize={11}
             tickLine={false}
-            angle={-20}
+            tickFormatter={formatXLabel}
+            angle={-25}
             textAnchor="end"
-            height={40}
+            interval={0}
+            height={50}
           />
-          <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
+          <YAxis stroke="#64748b" fontSize={11} tickLine={false} tickFormatter={formatYAxis} />
           <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={55}>
             {data.map((entry, index) => (
               <Cell key={`bar-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}

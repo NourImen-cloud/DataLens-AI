@@ -1,5 +1,10 @@
 import os
+import sys
 import shutil
+
+# Ensure current backend directory is in sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -91,6 +96,8 @@ async def upload_dataset(file: UploadFile = File(...)):
 def load_sample_dataset(name: str):
     allowed = {
         "retail_sales": ("retail_sales_2026.csv", "retail_sales_2026"),
+        "clinical_patients": ("clinical_patients.csv", "clinical_patients"),
+        "student_performance": ("student_performance.csv", "student_performance"),
         "saas_churn": ("saas_churn_metrics.csv", "saas_churn_metrics")
     }
     if name not in allowed:
@@ -125,34 +132,7 @@ def get_dataset_insights(dataset_id: str):
 
 @app.get("/api/dataset/{dataset_id}/suggested-questions")
 def get_suggested_questions(dataset_id: str):
-    profile = analysis_engine.get_profile(dataset_id)
-    if not profile:
-        return {"questions": [
-            "What are the main trends?",
-            "Which products perform best?",
-            "Are there unusual values?",
-            "What factors affect sales?",
-            "Generate a business summary"
-        ]}
-
-    num_cols = profile.get("numerical_cols", [])
-    cat_cols = profile.get("categorical_cols", [])
-    date_cols = profile.get("datetime_cols", [])
-
-    rev_col = next((c for c in num_cols if any(k in c.lower() for k in ["rev", "sales", "mrr", "amount", "total"])), num_cols[0] if num_cols else "values")
-    primary_cat = cat_cols[0] if cat_cols else "category"
-    second_cat = cat_cols[1] if len(cat_cols) > 1 else primary_cat
-
-    questions = [
-        f"Which {primary_cat} generated the most {rev_col}?",
-        f"What are the main trends in {rev_col} over time?",
-        f"Which {second_cat}s perform best?",
-        f"Are there unusual values in {rev_col}?",
-        f"What factors affect {rev_col}?",
-        f"Why did sales decrease in March?",
-        f"Generate a business summary"
-    ]
-    return {"questions": questions}
+    return analysis_engine.get_categorized_questions(dataset_id)
 
 @app.post("/api/query")
 def execute_query(req: QueryRequest):
