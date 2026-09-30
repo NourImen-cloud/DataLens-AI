@@ -1,10 +1,10 @@
-# DataLens AI 🔍⚡  
+# DataLens AI 
 > *“Turn any dataset into verified decisions through conversation.”*  
 > *“Upload your data. Ask anything. Understand everything.”*
 
 ---
 
-## 🌟 Executive Overview
+##  Executive Overview
 
 **DataLens AI** is an autonomous, domain-agnostic **AI Data Analysis Workspace & Decision Intelligence Copilot**. It bridges the gap between raw data and executive decision-making for non-technical users. 
 
@@ -23,47 +23,47 @@ flowchart LR
 
 ---
 
-## 🚀 Key Innovations & Flagship Capabilities
+##  Key Innovations & Flagship Capabilities
 
-### 1. 🤖 Domain-Adaptive Analysis Workspace
+### 1.Domain-Adaptive Analysis Workspace
 * **Automated Hypothesis Generator**: Eliminates the "blank screen problem" by profiling any dataset and proposing 10+ categorized questions across 5 investigative pillars:
-  * 🏆 **Performance & Volume Breakdowns**
-  * 📈 **Trends & Timeline Velocity**
-  * ⚠️ **Anomalies & 3x IQR Outliers**
-  * 🔗 **Drivers & Pearson Correlations**
-  * 📦 **Distribution & Composition Spread**
+  *  **Performance & Volume Breakdowns**
+  *  **Trends & Timeline Velocity**
+  *  **Anomalies & 3x IQR Outliers**
+  *  **Drivers & Pearson Correlations**
+  *  **Distribution & Composition Spread**
 * **Universal Domain Intelligence**: Automatically adapts metrics and terminology to:
-  * 🏥 **Healthcare & Clinical Diagnostics** (`systolic_bp`, `risk_score`, `department`)
-  * 🛒 **Retail & Commercial Commerce** (`revenue`, `units_sold`, `region`)
-  * 🎓 **Academic & Student Performance** (`midterm_score`, `study_hours`, `faculty`)
-  * 💼 **SaaS Retention & Product Telemetry** (`monthly_revenue`, `churn_status`, `plan_tier`)
-  * 📊 **Any Arbitrary CSV / Excel File** dropped by the user.
+  *  **Healthcare & Clinical Diagnostics** (`systolic_bp`, `risk_score`, `department`)
+  *  **Retail & Commercial Commerce** (`revenue`, `units_sold`, `region`)
+  *  **Academic & Student Performance** (`midterm_score`, `study_hours`, `faculty`)
+  *  **SaaS Retention & Product Telemetry** (`monthly_revenue`, `churn_status`, `plan_tier`)
+  *  **Any Arbitrary CSV / Excel File** dropped by the user.
 
-### 2. 🎙️ Voice AI "Executive Audio Briefing"
+### 2. Voice AI "Executive Audio Briefing"
 * Boardroom-ready spoken intelligence powered by browser-native Web Speech synthesis.
 * Live equalizer waveform animation and 30-second spoken executive overview with key quantitative metrics, leading cohort shares, and risk alerts.
 * Zero external API cost, ultra-low latency, and 100% offline-compatible.
 
-### 3. 🔮 Prescriptive "What-If" Scenario Simulator
+### 3. Prescriptive "What-If" Scenario Simulator
 * Takes analytics from *descriptive* ("What happened?") to *prescriptive* ("What should we do?").
 * Interactive sliders ($-50\%$ to $+100\%$) and cohort presets.
 * Re-computes projected volume shifts, baseline vs. projected deltas, and dual Recharts bar charts in real time.
 
-### 4. ⚖️ Cohort & Segment Comparator
+### 4. Cohort & Segment Comparator
 * Direct head-to-head benchmarking between any two segments (e.g. *North vs. South*, *Cardiology vs. Neurology*, *Enterprise vs. Starter*).
 * Generates a side-by-side Metric Scorecard with percentage variance, volume shares, and advantage leader badges.
 
-### 5. 🧹 1-Click AI Data Sanitation & Export
+### 5. 1-Click AI Data Sanitation & Export
 * Automated statistical cleaning using **3x IQR Winsorization** (clipping outliers without dropping valid rows).
 * Intelligent missing value imputation (median for numericals, standardized tags for categoricals).
 * Download sanitized CSV ready for data science pipelines.
 
-### 6. 📄 Boardroom-Ready Executive PDF Report
+### 6. Boardroom-Ready Executive PDF Report
 * Compiles an executive summary, high-level metrics, and bulleted takeaways into an exportable, printable PDF.
 
 ---
 
-## 📐 3-Page Dedicated Application Architecture
+##  -Page Dedicated Application Architecture
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -76,8 +76,8 @@ flowchart LR
 │ - Code Transparency │ - Records Table   │ - Pearson Drivers (|r|>=0.45)│
 └─────────────────────┴───────────────────┴──────────────────────────────┘
 
-
-## 🧪 Tech Stack & Engineering Rigor
+```
+##  -Tech Stack & Engineering Rigor
 
 | Layer | Technologies Used | Purpose |
 | :--- | :--- | :--- |
